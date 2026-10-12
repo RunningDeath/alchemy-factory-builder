@@ -60,6 +60,18 @@ describe("assignFlows", () => {
     ]);
   });
 
+  test("self-made fertilizer: as few producers as cover the module feed every consumer, the rest leaves", () => {
+    // Two blenders (20/min each) feed three nursery groups (17/min together) and export the rest.
+    // Each blender feeding other nurseries deadlocks: the starter box reaches only some plants
+    const flows = assignFlows([end("b1", "out", 20, 0), end("b2", "out", 20, 5), end("n1", "in", 9, 0), end("n2", "in", 6, 3), end("n3", "in", 2, 6)]);
+    const fed = (uid: string) => flows.filter((f) => f.to !== "export" && f.from !== "import" && f.from.uid === uid).map((f) => (f.to as LaneEnd).uid);
+    expect(fed("b1").sort()).toEqual(["n1", "n2", "n3"]);
+    expect(fed("b2")).toEqual([]);
+    const exported = (uid: string) => flows.filter((f) => f.to === "export" && f.from !== "import" && f.from.uid === uid).reduce((s, f) => s + f.rate, 0);
+    expect(exported("b1")).toBeCloseTo(3, 6);
+    expect(exported("b2")).toBeCloseTo(20, 6);
+  });
+
   test("rounded-up consumers share what is made instead of importing the difference", () => {
     const flows = assignFlows([end("p", "out", 100, 0), end("c1", "in", 60, 0), end("c2", "in", 60, 5)]);
     expect(flows.some((f) => f.from === "import")).toBe(false);
