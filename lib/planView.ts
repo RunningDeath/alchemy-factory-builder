@@ -45,7 +45,10 @@ export interface PlanView {
     raw: { itemName: string; rate: number; supplied: boolean }[];
     machines: { deviceId: string; name: string; built: number; exact: number }[];
     targets: { itemName: string; demand: number; delivered: number }[];
-    leftovers: { itemName: string; rate: number }[];
+    /** Rounded-up machines could make this much more: the belt backs up, nothing is lost */
+    spare: { itemName: string; rate: number }[];
+    /** Byproducts nobody in the plan uses: they need a sink (altar, trash, dispatch) */
+    unused: { itemName: string; rate: number }[];
     heatPerMinute: number;
 }
 
@@ -163,11 +166,10 @@ export function buildPlanView(roots: ProductionNode[], report: BeltReport | null
         raw: steps.filter((s) => s.isRaw && s.outputs.some((o) => o.rate > 0)).map((s) => ({ itemName: s.itemName, rate: s.outputs.reduce((n, o) => n + o.rate, 0), supplied: !!s.node.suppliedRate })),
         machines: [...machines].map(([deviceId, m]) => ({ deviceId, name: getDevice(deviceId)?.name ?? deviceId, ...m })).sort((a, b) => b.built - a.built),
         targets: report?.targets.map((t) => ({ itemName: t.itemName, demand: t.demand, delivered: t.delivered })) ?? [],
-        leftovers: steps.flatMap((s) => {
+        spare: steps.filter((s) => !s.isTarget && !s.isRaw && (s.belt?.leftoverRate ?? 0) > 0.05).map((s) => ({ itemName: s.itemName, rate: s.belt!.leftoverRate })),
+        unused: steps.flatMap((s) => {
             const sent = (name: string) => s.outputs.filter((o) => o.itemName === name).reduce((n, o) => n + o.rate, 0);
-            const main = s.isTarget ? 0 : (s.belt?.leftoverRate ?? 0);
-            const extra = s.node.byproducts.map((b) => ({ itemName: b.itemName, rate: b.rate - sent(b.itemName) }));
-            return [{ itemName: s.itemName, rate: main }, ...extra].filter((l) => l.rate > 0.05);
+            return s.node.byproducts.map((b) => ({ itemName: b.itemName, rate: b.rate - sent(b.itemName) })).filter((l) => l.rate > 0.05);
         }),
         heatPerMinute: steps.reduce((n, s) => n + s.node.heatConsumption, 0),
     };

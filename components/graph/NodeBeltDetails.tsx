@@ -61,7 +61,7 @@ export function NodeBeltDetails({ belt }: { belt: NodeBeltInfo }) {
                     )}
                     {hasLeftover && (
                         <span className="font-bold text-[var(--info)]">
-                            +{formatRate(belt.leftoverRate)}/m surplus (not used downstream)
+                            +{formatRate(belt.leftoverRate)}/m spare capacity (the belt backs up, machines wait)
                         </span>
                     )}
                 </div>

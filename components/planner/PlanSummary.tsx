@@ -57,13 +57,25 @@ export function PlanSummary({ view }: { view: PlanView }) {
                         </p>
                     )}
                 </section>
-                {view.leftovers.length > 0 && (
+                {view.unused.length > 0 && (
                     <section>
                         <h3 className="mb-1 flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                            <AlertTriangle className="h-3 w-3" /> Left over
+                            <AlertTriangle className="h-3 w-3" /> Byproducts nobody uses
                         </h3>
+                        <p className="mb-1 text-xs text-[var(--text-muted)]">Need a sink: altar, trash barrel or dispatch portal.</p>
                         <ul>
-                            {view.leftovers.map((l, i) => (
+                            {view.unused.map((l, i) => (
+                                <Row key={`${l.itemName}-${i}`} item={l.itemName} label={l.itemName} value={`${formatRate(l.rate)}/min`} tone="warn" />
+                            ))}
+                        </ul>
+                    </section>
+                )}
+                {view.spare.length > 0 && (
+                    <section>
+                        <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Spare capacity</h3>
+                        <p className="mb-1 text-xs text-[var(--text-muted)]">Whole machines could make this much more. The belt backs up and they wait; nothing is lost.</p>
+                        <ul>
+                            {view.spare.map((l, i) => (
                                 <Row key={`${l.itemName}-${i}`} item={l.itemName} label={l.itemName} value={`+${formatRate(l.rate)}/min`} tone="muted" />
                             ))}
                         </ul>

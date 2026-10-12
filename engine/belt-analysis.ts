@@ -352,7 +352,8 @@ export function analyzeBelts(
   });
   // The rate the player asked for: the net output may be more (a fertilizer reserve that
   // isn't eaten leaves as product too)
-  const asked = (item: string) => config.targets.find((t) => t.item === item)?.rate;
+  // (targets hold item ids or names, nodes display names)
+  const asked = (item: string) => config.targets.filter((t) => normalizeItemId(t.item) === normalizeItemId(item)).reduce((sum, t) => sum + t.rate, 0) || undefined;
   const targetList = roots.map((r) => ({ nodeKey: nodeKeyOf(r), itemName: r.itemName, demand: Math.min(r.netOutputRate ?? r.rate, asked(r.itemName) ?? Infinity) }));
   const flow = simulateFlow(
     flowNodes,
