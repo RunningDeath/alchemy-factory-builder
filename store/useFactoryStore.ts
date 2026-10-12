@@ -79,6 +79,8 @@ interface FactoryStore {
     activeFactoryId: string | null;
     research: ResearchState;
     buildUnlocks: BuildUnlocks;
+    /** The player closed the research section (it starts open) */
+    researchCollapsed: boolean;
 
     addFactory: (name?: string) => string;
     removeFactory: (id: string) => void;
@@ -96,6 +98,7 @@ interface FactoryStore {
     setResearch: (field: keyof ResearchState, value: number) => void;
     resetResearch: () => void;
     setBuildUnlocks: (unlocks: BuildUnlocks) => void;
+    setResearchCollapsed: (collapsed: boolean) => void;
     /** Recompute every factory (after loading) */
     recalculate: () => void;
 }
@@ -121,6 +124,7 @@ export const useFactoryStore = create<FactoryStore>()(
                 activeFactoryId: null,
                 research: DEFAULT_RESEARCH,
                 buildUnlocks: { level: MAX_LEVEL },
+                researchCollapsed: false,
 
                 addFactory: (name) => {
                     const id = newId();
@@ -171,6 +175,7 @@ export const useFactoryStore = create<FactoryStore>()(
                     get().recalculate();
                 },
                 setBuildUnlocks: (buildUnlocks) => set({ buildUnlocks }),
+                setResearchCollapsed: (researchCollapsed) => set({ researchCollapsed }),
                 recalculate: () => set((state) => ({ factories: state.factories.map((f) => ({ ...f, ...compute(f, state.research) })) })),
             };
         },
@@ -183,6 +188,7 @@ export const useFactoryStore = create<FactoryStore>()(
                 activeFactoryId: state.activeFactoryId,
                 research: state.research,
                 buildUnlocks: state.buildUnlocks,
+                researchCollapsed: state.researchCollapsed,
                 factories: state.factories.map(({ productionTrees: _p, beltReport: _b, ...rest }) => rest),
             }),
             onRehydrateStorage: () => (state) => state?.recalculate(),

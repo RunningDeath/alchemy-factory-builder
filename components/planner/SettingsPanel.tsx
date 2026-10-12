@@ -15,8 +15,23 @@ import { ResearchFields } from "@/components/research/ResearchFields";
 const isFuel = (i: Item) => !!i.heat_value;
 const isFertilizer = (i: Item) => !!i.nutrient_value;
 
-function Section({ title, children, defaultOpen = true }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
-    const [open, setOpen] = useState(defaultOpen);
+function Section({
+    title,
+    children,
+    defaultOpen = true,
+    open: controlled,
+    onToggle,
+}: {
+    title: string;
+    children: React.ReactNode;
+    defaultOpen?: boolean;
+    /** Controlled from outside (remembered state) */
+    open?: boolean;
+    onToggle?: (open: boolean) => void;
+}) {
+    const [own, setOwn] = useState(defaultOpen);
+    const open = controlled ?? own;
+    const setOpen = (next: boolean) => (onToggle ? onToggle(next) : setOwn(next));
     return (
         <div className="border-t border-[var(--border-subtle)] first:border-t-0">
             <button onClick={() => setOpen(!open)} className="flex min-h-11 w-full items-center justify-between px-4 text-left text-sm font-semibold text-[var(--text-primary)]" aria-expanded={open}>
@@ -32,14 +47,16 @@ function Section({ title, children, defaultOpen = true }: { title: string; child
 export function SettingsPanel({ factory }: { factory: FactoryData }) {
     const updateConfig = useFactoryStore((s) => s.updateFactoryConfig);
     const c = factory.config;
-    // First visit (no level entered yet): research open, so the levels get entered first
-    const [firstVisit] = useState(() => Object.values(useFactoryStore.getState().research).every((level) => level === 0));
+    // Research starts open (the levels matter for everything); closing it is remembered
+    const researchOpen = useFactoryStore((s) => !s.researchCollapsed);
+    const setResearchCollapsed = useFactoryStore((s) => s.setResearchCollapsed);
+    const noLevels = useFactoryStore((s) => Object.values(s.research).every((level) => level === 0));
     const set = (updates: Partial<FactoryConfig>) => updateConfig(factory.id, updates);
 
     return (
         <Panel>
-            <Section title="Research (all factories)" defaultOpen={firstVisit}>
-                {firstVisit && <p className="text-xs text-[var(--accent-gold)]">Enter your research levels from the game first: they change machine and belt speeds.</p>}
+            <Section title="Research (all factories)" open={researchOpen} onToggle={(open) => setResearchCollapsed(!open)}>
+                {noLevels && <p className="text-xs text-[var(--accent-gold)]">Enter your research levels from the game first: they change machine and belt speeds.</p>}
                 <ResearchFields />
             </Section>
             <Section title="Fuel and fertilizer">
