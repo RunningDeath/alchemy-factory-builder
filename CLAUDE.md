@@ -4,7 +4,7 @@
 - Line endings: LF everywhere (`.gitattributes`).
 - Mobile first: every page must work at 360 px width with a 16 px gutter and no horizontal page scroll. Desktop adds columns; it never needs them.
 - No code copied from other Alchemy Factory projects (none of them has a license). Use them only as references for game mechanics and write our own implementation.
-- Game icons (`public/game-icons/`) are game assets: gitignored, never committed.
+- Game icons (`public/game-icons/`) are exported from the game with tools/extract-game-data and published (fan project, credited in the README). Never copy icons from other projects. `lib/itemGlyph.ts` gives items without an icon our own symbol.
 
 ## Layout
 

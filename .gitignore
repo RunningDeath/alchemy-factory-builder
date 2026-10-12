@@ -15,8 +15,6 @@ next-env.d.ts
 /tools/extract-game-data/obj/
 /dt_*.json
 
-# game icons exported locally by tools/extract-game-data (game assets, not ours to commit)
-/public/game-icons/
 
 /.claude/worktrees/
 /.scratch/
