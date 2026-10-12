@@ -186,10 +186,28 @@ export function assignFlows(
         const totalDemand = demand.reduce((a, b) => a + b, 0);
         if (producers.length > 0 && totalDemand > totalSupply) demand.forEach((d, k) => (demand[k] = (d * totalSupply) / totalDemand));
 
-        // Made here, used here and sent out too (self-made fertilizer): every producer feeds its
-        // share of the module first, so each gets a priority splitter and only leftovers leave
+        // Made here, used here and sent out too (self-made fertilizer): the module is fed first
+        // (a priority splitter, only leftovers leave). As few producers as cover it feed every
+        // consumer, so their back flows reach all of them: one starter box upstream starts every
+        // nursery. Producers each feeding other nurseries deadlock: the box reaches only some
+        // plants, and the potion needs all of them before any producer runs
         const shared = producers.length > 1 && consumers.length > 0 && totalSupply > totalDemand + 1e-6 && (exportable?.(itemName) ?? true);
-        const quota = shared ? supply.map((s) => (s * totalDemand) / totalSupply) : [...supply];
+        if (shared) {
+            let needed = 0;
+            let covered = 0;
+            while (needed < producers.length && covered < totalDemand - 1e-6) covered += supply[needed++];
+            const feeding = supply.slice(0, needed).reduce((a, b) => a + b, 0);
+            for (let k = 0; k < needed; k++) {
+                const part = supply[k] / feeding;
+                consumers.forEach((c, n) => {
+                    const f = demand[n] * part;
+                    if (f > 1e-6) connections.push({ itemName, rate: f, from: producers[k], to: c });
+                    supply[k] -= f;
+                });
+            }
+            demand.fill(0);
+        }
+        const quota = [...supply];
         let i = 0;
         let j = 0;
         while (i < producers.length && j < consumers.length) {
