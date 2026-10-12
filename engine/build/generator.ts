@@ -112,6 +112,8 @@ export interface ModuleOptions {
 
 /** One storey: walls and pillars are 16 cells high */
 export const STOREY_HEIGHT = 16;
+/** Default module height: a storey less one cell */
+export const DEFAULT_MAX_HEIGHT = 15;
 /** Cells under the ceiling a module can't use (checked in game: a 16-high module stuck out by one) */
 const CEILING_CELLS = 1;
 
@@ -129,7 +131,7 @@ export function moduleTooBig(steps: ModuleStep[]): { machines: number; biggest: 
 export const DEFAULT_MODULE_OPTIONS: Omit<ModuleOptions, "beltSpeed"> = {
     maxWidth: 32,
     maxDepth: 32,
-    maxHeight: STOREY_HEIGHT,
+    maxHeight: DEFAULT_MAX_HEIGHT,
     maxStack: 4,
 };
 
