@@ -32,11 +32,14 @@ function Section({ title, children, defaultOpen = true }: { title: string; child
 export function SettingsPanel({ factory }: { factory: FactoryData }) {
     const updateConfig = useFactoryStore((s) => s.updateFactoryConfig);
     const c = factory.config;
+    // First visit (no level entered yet): research open, so the levels get entered first
+    const [firstVisit] = useState(() => Object.values(useFactoryStore.getState().research).every((level) => level === 0));
     const set = (updates: Partial<FactoryConfig>) => updateConfig(factory.id, updates);
 
     return (
         <Panel>
-            <Section title="Research (all factories)" defaultOpen={false}>
+            <Section title="Research (all factories)" defaultOpen={firstVisit}>
+                {firstVisit && <p className="text-xs text-[var(--accent-gold)]">Enter your research levels from the game first: they change machine and belt speeds.</p>}
                 <ResearchFields />
             </Section>
             <Section title="Fuel and fertilizer">
