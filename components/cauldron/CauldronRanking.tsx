@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Flame, Leaf, Search, Timer, X } from "lucide-react";
 import type { ScoreParts } from "@/engine/cauldron-score";
@@ -39,6 +39,11 @@ export function CauldronRanking({ rows, slots }: { rows: MixRow[]; slots: number
     const [query, setQuery] = useState("");
     const [plantsOnly, setPlantsOnly] = useState(false);
     const [bestOnly, setBestOnly] = useState(true);
+    // Item pages link here with ?q=<item name>
+    useEffect(() => {
+        const q = new URLSearchParams(window.location.search).get("q");
+        if (q) setQuery(q);
+    }, []);
 
     const groups = useMemo(() => {
         const q = query.trim().toLowerCase();
@@ -91,7 +96,7 @@ export function CauldronRanking({ rows, slots }: { rows: MixRow[]; slots: number
                 {groups.map(([name, list]) => (
                     <div key={name} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 space-y-3">
                         <div className="flex items-baseline justify-between gap-2">
-                            <Link href={`/items/${list[0].output.id}`} className="font-cinzel text-lg font-bold text-[var(--accent-gold)] hover:underline">
+                            <Link href={`/codex/items/${list[0].output.id}`} className="font-cinzel text-lg font-bold text-[var(--accent-gold)] hover:underline">
                                 {name}
                             </Link>
                             <span className="flex items-center gap-3 text-xs text-[var(--text-muted)]">
@@ -118,7 +123,7 @@ export function CauldronRanking({ rows, slots }: { rows: MixRow[]; slots: number
                                     {row.inputs.map((i, k) => (
                                         <span key={i.id} className="flex items-center gap-1">
                                             {k > 0 && <span className="text-[var(--text-muted)]">+</span>}
-                                            <Link href={`/items/${i.id}`} className="flex items-center gap-1 text-[var(--text-primary)] hover:text-[var(--accent-gold)]">
+                                            <Link href={`/codex/items/${i.id}`} className="flex items-center gap-1 text-[var(--text-primary)] hover:text-[var(--accent-gold)]">
                                                 {i.count > 1 && <span className="text-[var(--text-muted)]">{i.count}×</span>}
                                                 {i.name}
                                                 {i.plant && <Leaf className="w-3 h-3 text-[var(--success)]" aria-label="plant-based" />}

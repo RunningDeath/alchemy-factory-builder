@@ -4,14 +4,14 @@ import { BeltReport } from "../../engine/belt-analysis";
 import { getDevice } from "../../engine/item-utils";
 import { formatRate } from "../../lib/beltDisplay";
 import { MachineWarningText } from "./MachineWarningText";
-import { OrnatePanel } from "../ui/OrnatePanel";
+import { Panel } from "../ui/Panel";
 
 const deviceName = (id?: string) => (id ? getDevice(id)?.name ?? id : "Machine");
 
 function SectionHeader({ icon, title }: { icon: ReactNode; title: string }) {
     return (
         <div className="flex flex-col gap-2">
-            <div className="divider-ornate"></div>
+            <div className="h-px bg-[var(--border-subtle)]" />
             <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wide flex items-center gap-1.5">
                 {icon} {title}
             </span>
@@ -24,7 +24,7 @@ export function BeltSummaryPanel({ report }: { report: BeltReport }) {
     const beltItems = report.lines.filter((l) => l.lines > 0);
 
     return (
-        <OrnatePanel className="p-4 flex flex-col gap-3" accentColor="purple">
+        <Panel className="p-4 flex flex-col gap-3">
             <div className="flex items-center justify-between gap-2">
                 <h3 className="font-semibold text-[var(--accent-gold)] flex items-center gap-2 text-xs uppercase tracking-wider">
                     <GitFork size={14} className="text-[var(--accent-purple)]" /> Build Plan
@@ -34,7 +34,7 @@ export function BeltSummaryPanel({ report }: { report: BeltReport }) {
                 </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 max-h-[220px] overflow-y-auto custom-scrollbar">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                 <div className="flex flex-col gap-2">
                     <SectionHeader icon={<Factory size={10} />} title="Machines (exact → built)" />
                     <div className="flex flex-col gap-1.5">
@@ -129,6 +129,6 @@ export function BeltSummaryPanel({ report }: { report: BeltReport }) {
                     </div>
                 </div>
             </div>
-        </OrnatePanel>
+        </Panel>
     );
 }

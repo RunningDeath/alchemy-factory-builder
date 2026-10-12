@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { OrnatePanel } from "@/components/ui/OrnatePanel";
+import { Panel } from "@/components/ui/Panel";
 import { allDevices, DEVICE_CATEGORY_LABEL, deviceById } from "@/lib/codex/devices";
 
 interface PageProps {
@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     const { id } = await params;
     const device = deviceById(id);
     return device
-        ? { title: `${device.name} | Alchemy Factory Tools`, description: `${device.name}: size, ports, heat, build cost and recipes.` }
+        ? { title: `${device.name}`, description: `${device.name}: size, ports, heat, build cost and recipes.` }
         : { title: "Device Not Found" };
 }
 
@@ -32,9 +32,9 @@ function Stat({ label, value }: { label: string; value: React.ReactNode }) {
 
 /** Pages with more on a device: the cauldron rankings and the paradox calculator */
 const MORE: Record<string, { href: string; label: (mixes?: number) => string }> = {
-    cauldron: { href: "/cauldron", label: (n) => `All ${n} mixes with their builder score` },
-    "advanced-cauldron": { href: "/advanced-cauldron", label: (n) => `All ${n} mixes with their builder score` },
-    "paradox-crucible": { href: "/paradox-crucible", label: () => "Open the calculator" },
+    cauldron: { href: "/codex/cauldron", label: (n) => `All ${n} mixes with their builder score` },
+    "advanced-cauldron": { href: "/codex/advanced-cauldron", label: (n) => `All ${n} mixes with their builder score` },
+    "paradox-crucible": { href: "/codex/paradox-crucible", label: () => "Open the calculator" },
 };
 
 export default async function DevicePage({ params }: PageProps) {
@@ -44,11 +44,11 @@ export default async function DevicePage({ params }: PageProps) {
     const more = MORE[d.id];
     return (
         <div className="flex flex-col max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 gap-6">
-            <Link href="/devices" className="inline-flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--accent-gold)] transition-colors">
+            <Link href="/codex/devices" className="inline-flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--accent-gold)] transition-colors">
                 <ArrowLeft className="w-4 h-4" />
                 <span>Back to Devices</span>
             </Link>
-            <OrnatePanel className="p-6">
+            <Panel className="p-6">
                 <div className="space-y-4">
                     <div>
                         <h1 className="font-cinzel text-3xl font-bold text-[var(--accent-gold)] mb-1">{d.name}</h1>
@@ -67,7 +67,7 @@ export default async function DevicePage({ params }: PageProps) {
                             <div className="text-xs text-[var(--text-muted)]">Build cost</div>
                             <div className="flex flex-wrap gap-2">
                                 {d.cost.map((c) => (
-                                    <Link key={c.id} href={`/items/${c.id}`} className="rounded border border-[var(--border)] px-2 py-1 text-sm hover:border-[var(--accent-gold-dim)]">
+                                    <Link key={c.id} href={`/codex/items/${c.id}`} className="rounded border border-[var(--border)] px-2 py-1 text-sm hover:border-[var(--accent-gold-dim)]">
                                         {c.count}× {c.name}
                                     </Link>
                                 ))}
@@ -75,24 +75,24 @@ export default async function DevicePage({ params }: PageProps) {
                         </div>
                     )}
                 </div>
-            </OrnatePanel>
+            </Panel>
             {more && (
                 <Link href={more.href} className="text-[var(--accent-gold)] hover:underline">
                     {more.label(d.mixes)} →
                 </Link>
             )}
             {d.recipes.length > 0 && (
-                <OrnatePanel className="p-6 space-y-3">
+                <Panel className="p-6 space-y-3">
                     <h2 className="font-cinzel text-xl font-bold text-[var(--accent-gold)]">Recipes ({d.recipes.length})</h2>
                     <div className="grid gap-2 sm:grid-cols-2">
                         {d.recipes.map((r) => (
-                            <Link key={r.id} href={`/items/${r.outputId}`} className="flex justify-between rounded border border-[var(--border)] px-3 py-2 text-sm hover:border-[var(--accent-gold-dim)]">
+                            <Link key={r.id} href={`/codex/items/${r.outputId}`} className="flex justify-between rounded border border-[var(--border)] px-3 py-2 text-sm hover:border-[var(--accent-gold-dim)]">
                                 <span className="text-[var(--text-primary)]">{r.output}</span>
                                 <span className="text-[var(--text-muted)]">{r.time}s</span>
                             </Link>
                         ))}
                     </div>
-                </OrnatePanel>
+                </Panel>
             )}
         </div>
     );

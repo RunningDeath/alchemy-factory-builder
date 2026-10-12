@@ -22,7 +22,7 @@ export function splitEdgeKey(key: string): [source: string, target: string] {
 }
 
 export interface PlanGraph {
-    /** Merged nodes by key (inputs and byproducts cleared) */
+    /** Merged nodes by key (inputs cleared) */
     nodes: Map<string, ProductionNode>;
     /** Demand rate per edge, keyed by edgeKey(source, target) */
     edgeRates: Map<string, number>;
@@ -49,7 +49,7 @@ export function collectPlanGraph(rootNodes: ProductionNode[]): PlanGraph {
                 existing.suppliedRate = (existing.suppliedRate || 0) + (node.suppliedRate || 0);
                 existing.isBeltSaturated = existing.rate > (existing.beltLimit || 60);
             } else {
-                mergedNodes.set(key, { ...node, inputs: [], byproducts: [] });
+                mergedNodes.set(key, { ...node, inputs: [], byproducts: node.byproducts.map((b) => ({ ...b })) });
             }
         }
         for (const input of node.inputs) {

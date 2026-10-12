@@ -3,7 +3,7 @@ import { CauldronRanking } from "@/components/cauldron/CauldronRanking";
 import { cauldronRows } from "@/lib/codex/cauldron-rows";
 
 export const metadata: Metadata = {
-    title: "Advanced Cauldron Recipes | Alchemy Factory Tools",
+    title: "Advanced Cauldron Recipes",
     description: "Every advanced cauldron mix by what it makes, rated by how well it builds.",
 };
 

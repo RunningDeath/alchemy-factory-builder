@@ -20,6 +20,11 @@ import { BuildToolbar, type BuildViewMode } from "./BuildToolbar";
 import { LayerGrid, type BuildTool } from "./LayerGrid";
 import { ModuleGroupsPanel } from "./ModuleGroupsPanel";
 import { View3D } from "./View3D";
+import { Segmented } from "../ui/Segmented";
+import { cn } from "../../lib/utils";
+
+/** Below 2xl the side panels don't fit next to the layout: one of the three at a time */
+type BuildPanel = "layout" | "modules" | "info";
 
 const EMPTY: Placement[] = [];
 
@@ -63,6 +68,7 @@ export function BuildPlanner() {
     const options = useMemo(() => ({ ...DEFAULT_MODULE_OPTIONS, ...layout?.options }), [layout?.options]);
     const report = factory?.beltReport ?? null;
 
+    const [panel, setPanel] = useState<BuildPanel>("layout");
     const [tool, setTool] = useState<BuildTool | null>(null);
     const [level, setLevel] = useState(0);
     const [selectedUid, setSelectedUid] = useState<string | null>(null);
@@ -298,7 +304,7 @@ export function BuildPlanner() {
     const locked = lockedBuildings(new Set(placements.map((p) => p.id)), unlocks);
 
     return (
-        <div className="flex flex-col h-[calc(100vh-2rem)] min-h-[680px]">
+        <div className="flex flex-col h-[calc(100dvh-9rem)] min-h-[560px] overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
             {exporting && (
                 <ExportBlueprintDialog
                     placements={placements}
@@ -339,8 +345,20 @@ export function BuildPlanner() {
                 onUnlocksChange={setUnlocks}
             />
             {progress && <GenerateProgress fraction={progress.fraction} label={progress.label} onAbort={abortGenerate} />}
+            <div className="2xl:hidden border-b border-[var(--border)] p-2">
+                <Segmented<BuildPanel>
+                    label="Build panel"
+                    value={panel}
+                    onChange={setPanel}
+                    options={[
+                        { value: "modules", label: "Modules" },
+                        { value: "layout", label: "Layout" },
+                        { value: "info", label: "Info" },
+                    ]}
+                />
+            </div>
             <div className="flex flex-1 min-h-0">
-                <aside className="w-56 shrink-0 border-r border-[var(--border)] p-3 overflow-y-auto custom-scrollbar flex flex-col gap-4">
+                <aside className={cn("w-full 2xl:w-56 shrink-0 2xl:border-r border-[var(--border)] p-3 overflow-y-auto custom-scrollbar flex-col gap-4 2xl:flex", panel === "modules" ? "flex" : "hidden")}>
                     <ModuleGroupsPanel
                         steps={steps}
                         enabled={!!options.modules}
@@ -352,7 +370,7 @@ export function BuildPlanner() {
                     <BuildPalette steps={steps} placedByNode={placedByNode} tool={tool} onSelectTool={setTool} />
                 </aside>
 
-                <div className="flex-1 min-w-0 flex flex-col">
+                <div className={cn("flex-1 min-w-0 flex-col 2xl:flex", panel === "layout" ? "flex" : "hidden")}>
                     <div className="px-3 py-1.5 text-[11px] text-[var(--text-muted)] border-b border-[var(--border)] flex flex-wrap gap-x-4 gap-y-1">
                         {tool ? (
                             <span>
@@ -426,7 +444,7 @@ export function BuildPlanner() {
                     </div>
                 </div>
 
-                <aside className="w-72 shrink-0 border-l border-[var(--border)] p-3 overflow-y-auto custom-scrollbar">
+                <aside className={cn("w-full 2xl:w-72 shrink-0 2xl:border-l border-[var(--border)] p-3 overflow-y-auto custom-scrollbar 2xl:block", panel === "info" ? "block" : "hidden")}>
                     <BuildInfoPanel
                         placements={placements}
                         issues={issues}

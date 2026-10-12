@@ -57,7 +57,7 @@ export function ParadoxCalculator() {
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-[var(--border)]">
                         <div>
                             <div className="text-xs text-[var(--text-muted)]">Product</div>
-                            <Link href={`/items/${brew.product.id}`} className="font-semibold text-[var(--accent-gold)] hover:underline">
+                            <Link href={`/codex/items/${brew.product.id}`} className="font-semibold text-[var(--accent-gold)] hover:underline">
                                 {brew.product.name}
                             </Link>
                         </div>

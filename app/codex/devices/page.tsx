@@ -4,7 +4,7 @@ import { Flame, Lock } from "lucide-react";
 import { allDevices, DEVICE_CATEGORY_LABEL, deviceCategories } from "@/lib/codex/devices";
 
 export const metadata: Metadata = {
-    title: "Devices | Alchemy Factory Tools",
+    title: "Devices",
     description: "Every machine, heating device, portal and storage: size, ports, heat, build cost and unlock level.",
 };
 
@@ -26,7 +26,7 @@ export default function DevicesPage() {
                             {list.map((d) => (
                                 <Link
                                     key={d.id}
-                                    href={`/devices/${d.id}`}
+                                    href={`/codex/devices/${d.id}`}
                                     className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 hover:border-[var(--accent-gold-dim)] transition-colors"
                                 >
                                     <div className="flex items-baseline justify-between gap-2">

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { ParadoxCalculator } from "@/components/paradox/ParadoxCalculator";
 
 export const metadata: Metadata = {
-    title: "Paradox Crucible | Alchemy Factory Tools",
+    title: "Paradox Crucible",
     description: "What a Paradox Crucible brews from a batch, how fast, and at what heat.",
 };
 

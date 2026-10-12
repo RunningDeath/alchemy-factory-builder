@@ -1,0 +1,138 @@
+@import "tailwindcss";
+
+/* Colors as tokens: dark is the default, light when the system or the toggle asks for it */
+:root {
+    --background: #14111c;
+    --background-deep: #0d0b13;
+    --surface: #1d1928;
+    --surface-elevated: #272135;
+    --border: #3a3150;
+    --border-subtle: #2a2439;
+    --text-primary: #ece6f6;
+    --text-secondary: #bdb3d1;
+    --text-muted: #8a809e;
+    --accent-gold: #e3b45a;
+    --accent-gold-bright: #f5cf7d;
+    --accent-gold-dim: #8f7240;
+    --accent-purple: #a78bfa;
+    --accent-purple-dim: #4c3d7a;
+    --success: #4ade80;
+    --warning: #fbbf24;
+    --error: #f87171;
+    --error-dim: #5c2a2a;
+    --info: #60a5fa;
+    --nav-height: 64px;
+    color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+        --background: #f7f3ea;
+        --background-deep: #ece6d8;
+        --surface: #ffffff;
+        --surface-elevated: #fbf8f1;
+        --border: #d9cfbb;
+        --border-subtle: #e8e0cf;
+        --text-primary: #2a2236;
+        --text-secondary: #4f4560;
+        --text-muted: #7c7189;
+        --accent-gold: #9a6b14;
+        --accent-gold-bright: #b8821c;
+        --accent-gold-dim: #d8b878;
+        --accent-purple: #6d4fd1;
+        --accent-purple-dim: #d9cff7;
+        --success: #15803d;
+        --warning: #b45309;
+        --error: #b91c1c;
+        --error-dim: #f6d5d5;
+        --info: #1d4ed8;
+        color-scheme: light;
+    }
+}
+
+:root[data-theme="light"] {
+    --background: #f7f3ea;
+    --background-deep: #ece6d8;
+    --surface: #ffffff;
+    --surface-elevated: #fbf8f1;
+    --border: #d9cfbb;
+    --border-subtle: #e8e0cf;
+    --text-primary: #2a2236;
+    --text-secondary: #4f4560;
+    --text-muted: #7c7189;
+    --accent-gold: #9a6b14;
+    --accent-gold-bright: #b8821c;
+    --accent-gold-dim: #d8b878;
+    --accent-purple: #6d4fd1;
+    --accent-purple-dim: #d9cff7;
+    --success: #15803d;
+    --warning: #b45309;
+    --error: #b91c1c;
+    --error-dim: #f6d5d5;
+    --info: #1d4ed8;
+    color-scheme: light;
+}
+
+@theme inline {
+    --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+    --font-cinzel: var(--font-cinzel-face), Georgia, serif;
+}
+
+html,
+body {
+    background: var(--background);
+    color: var(--text-primary);
+}
+
+body {
+    font-family: var(--font-sans);
+    -webkit-tap-highlight-color: transparent;
+    overflow-x: hidden;
+}
+
+.font-cinzel {
+    font-family: var(--font-cinzel);
+    letter-spacing: 0.02em;
+}
+
+/* Thin scrollbars inside panels */
+.custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+}
+
+/* Space for the bottom navigation on phones (and the iPhone home bar) */
+.pb-nav {
+    padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom) + 16px);
+}
+@media (min-width: 1024px) {
+    .pb-nav {
+        padding-bottom: 32px;
+    }
+}
+
+/* Number inputs without spinners: steppers are buttons, big enough for a thumb */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+input[type="number"] {
+    -moz-appearance: textfield;
+}
+
+:focus-visible {
+    outline: 2px solid var(--accent-gold);
+    outline-offset: 2px;
+}
+
+/* React Flow follows the theme */
+.react-flow {
+    --xy-background-color: var(--background-deep);
+    --xy-node-background-color: var(--surface);
+    --xy-node-border-radius: 10px;
+    --xy-controls-button-background-color: var(--surface);
+    --xy-controls-button-color: var(--text-primary);
+    --xy-controls-button-border-color: var(--border);
+    --xy-minimap-background-color: var(--surface);
+}

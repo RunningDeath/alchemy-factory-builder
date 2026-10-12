@@ -178,7 +178,7 @@ export interface ProductionNode {
 // Saved factories
 // ---------------------------------------------------------------------------
 
-export type ViewMode = "graph" | "list" | "build";
+export type ViewMode = "list" | "graph" | "belts" | "build";
 
 /** Generator settings for the Build view */
 export interface BuildOptions {
