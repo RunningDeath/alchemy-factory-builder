@@ -250,6 +250,32 @@ describe("separate inputs, filters and heating", () => {
     expect(mod.placements.some((p) => p.id === "stone-stove")).toBe(false);
   });
 
+  test("steam heating: two-input machines on the platform get supported stub lifts and fed heaters", () => {
+    // Athanors stand one level up on their heaters; the lifts down into their second input need support
+    for (const machines of [2, 4, 6]) {
+      const mod = generateModule(
+        [
+          step({
+            deviceId: "athanor",
+            machines,
+            inputs: [
+              { itemName: "Iron Ingot", perMachineRate: 20 },
+              { itemName: "Coke Powder", perMachineRate: 20 },
+            ],
+            outputs: [{ itemName: "Steel Ingot", perMachineRate: 20 }],
+            heating: { kind: "steam", fuelItem: "Steam", fuelRate: 60 },
+          }),
+        ],
+        options,
+      );
+      expect(validateLayout(mod.placements)).toEqual([]);
+      const steam = mod.placements.filter((p) => p.id === "pipe");
+      const fedHeaters = mod.placements.filter((p) => p.id === "steam-heater" && p.pipeEnd);
+      expect(fedHeaters.length).toBeGreaterThan(0);
+      expect(steam.length).toBeGreaterThanOrEqual(fedHeaters.length);
+    }
+  });
+
   test("a heated machine without a heating device under it is flagged", () => {
     const issues = validateLayout([{ uid: "c", id: "crucible", x: 0, y: 0, z: 0, rot: 0 }]);
     expect(issues.map((i) => i.kind)).toContain("unheated");

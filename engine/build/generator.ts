@@ -693,7 +693,8 @@ function buildTier(
         const length = stacking.beamLength!;
         for (const endX of [d.x, d.x + length - 1]) placements.push(...supportColumn(occupancy, endX, d.y, d.z, 0, makeUid));
     }
-    const liftBottoms = fed.lifts.filter((l) => l.id === "conveyer-lift-upwards");
+    // Lane lifts up and the short stub lifts down into raised ports (machines on a heating platform)
+    const liftBottoms = lifts.filter((l) => l.id === "conveyer-lift-upwards" || l.id === "conveyer-lift-downwards");
     const filters = lifts.filter((l) => l.id.startsWith("filter"));
     const raised = [...belts, ...liftBottoms, ...filters, ...(platform?.belts ?? [])].filter((bb) => bb.z > 0).sort((a, c) => a.z - c.z);
     // Every bottom cell (a flat filter covers four)
