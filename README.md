@@ -2,7 +2,7 @@
 
 Plans production for [Alchemy Factory](https://store.steampowered.com/app/3591710/Alchemy_Factory/), generates compact, stackable factory modules from the plan and exports them as in-game blueprints. Works on phones as well as on desktop.
 
-**Live:** https://alchemy-factory-builder-planner.vercel.app/
+**Live:** https://alchemy-factory-plan-tool.vercel.app/
 
 - **Planner**: pick targets, research levels, fuel and fertilizer. A linear program chooses recipes and rates (cheapest raw materials, simplest machines), including self-made fuel and fertilizer loops and cauldron mixes.
 - **Build**: turns the plan into modules (towers, belts, splitters, pipes, heaters, starter box) and exports a blueprint file the game loads.
