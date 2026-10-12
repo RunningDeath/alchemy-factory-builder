@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NAV_LINKS } from "./nav";
+import { BuildBadge } from "./BuildBadge";
 import { ThemeToggle } from "./ThemeToggle";
 
 /** Header with the sections on desktop; a bottom tab bar on phones */
@@ -54,7 +55,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                             </div>
                         ))}
                     </nav>
-                    <div className="ml-auto">
+                    <div className="ml-auto flex items-center gap-3">
+                        <BuildBadge />
                         <ThemeToggle />
                     </div>
                 </div>
