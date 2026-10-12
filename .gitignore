@@ -1,0 +1,22 @@
+/node_modules
+/.next/
+/out/
+/coverage
+*.tsbuildinfo
+next-env.d.ts
+.env*
+.vercel
+.DS_Store
+*.pem
+*.log
+
+# game data extractor build output and dumps
+/tools/extract-game-data/bin/
+/tools/extract-game-data/obj/
+/dt_*.json
+
+# game icons exported locally by tools/extract-game-data (game assets, not ours to commit)
+/public/game-icons/
+
+/.claude/worktrees/
+/.scratch/
