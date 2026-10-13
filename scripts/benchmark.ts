@@ -66,6 +66,8 @@ interface Result extends Case {
     issueKinds?: Record<string, number>;
     size: [number, number, number];
     area: number;
+    /** Blocks standing on other blocks (towers): what the module stacks instead of spreading */
+    stacked: number;
     lifts: number;
     belts: number;
     work: number;
@@ -265,6 +267,8 @@ function runCase(c: Case): Result {
         issueKinds: issues.reduce<Record<string, number>>((m, i) => ((m[i.kind] = (m[i.kind] ?? 0) + 1), m), {}),
         size: mod.size,
         area: mod.size[0] * mod.size[1],
+        // Heated blocks stand on their heaters (z 1) but never on other blocks
+        stacked: mod.tiers.filter((t) => t.z > 0 && !t.heating).length,
         lifts: mod.placements.filter((p) => p.id === "conveyer-lift-upwards" || p.id === "conveyer-lift-downwards").length,
         belts: mod.placements.filter((p) => p.uid.startsWith("rb-")).length,
         work: mod.work ?? 0,
@@ -341,6 +345,8 @@ function compare(before: Result[], after: Result[]) {
     total("Layout issues", (r) => r.issues);
     total("Cases broken", (r) => (r.failed + r.issues > 0 ? 1 : 0));
     total("Area", (r) => r.area);
+    total("Height", (r) => r.size[2]);
+    total("Stacked blocks", (r) => r.stacked ?? 0);
     total("Lifts", (r) => r.lifts);
     total("Belt cells", (r) => r.belts);
     total("Routing work", (r) => r.work);
