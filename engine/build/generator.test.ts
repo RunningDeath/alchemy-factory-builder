@@ -4,7 +4,7 @@ import { analyzeBelts } from "../belt-analysis";
 import { PlannerConfig } from "../types";
 import { beltPieceFor } from "./belt-pieces";
 import { getFootprint } from "./footprint";
-import { DEFAULT_MODULE_OPTIONS, generateModule, machineRotation, moduleTooBig, stackingFor, type GeneratedModule, type ModuleStep } from "./generator";
+import { DEFAULT_MODULE_OPTIONS, generateModule, machineRotation, moduleTooBig, stackingFor, UnbuildableError, type GeneratedModule, type ModuleStep } from "./generator";
 import { portConnections, validateLayout } from "./layout";
 import { stepsFromReport } from "./module-steps";
 
@@ -279,6 +279,22 @@ describe("separate inputs, filters and heating", () => {
   test("a heated machine without a heating device under it is flagged", () => {
     const issues = validateLayout([{ uid: "c", id: "crucible", x: 0, y: 0, z: 0, rot: 0 }]);
     expect(issues.map((i) => i.kind)).toContain("unheated");
+  });
+});
+
+describe("unbuildable plans", () => {
+  test("a byproduct on the product's belt before filters are unlocked: declined, not laid out broken", () => {
+    const crusher = step({
+      deviceId: "stone-crusher",
+      itemName: "Salt",
+      inputs: [{ itemName: "Rock Salt", perMachineRate: 30 }],
+      outputs: [
+        { itemName: "Salt", perMachineRate: 30 },
+        { itemName: "Sand", perMachineRate: 10 },
+      ],
+    });
+    expect(() => generateModule([crusher], { ...options, unlocks: { level: 4 } })).toThrow(UnbuildableError);
+    expect(() => generateModule([crusher], { ...options, unlocks: { level: 5 } })).not.toThrow();
   });
 });
 

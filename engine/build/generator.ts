@@ -1186,8 +1186,28 @@ function withUnlockedHeating(step: ModuleStep, can: Capabilities): ModuleStep {
     return { ...step, heating: { kind: "stove", fuelItem, fuelRate } };
 }
 
+/**
+ * A plan the generator can't build with what the player has unlocked: no layout would run
+ * in game, so it says why instead of laying out a broken one
+ */
+export class UnbuildableError extends Error {}
+
+/**
+ * Steps whose machine puts more than one item on its single output belt (salt and sand
+ * from a stone crusher): without filters nothing can take them apart, the byproduct would
+ * block the next machine
+ */
+export function unsortableSteps(steps: ModuleStep[], unlocks?: BuildUnlocks): ModuleStep[] {
+    return capabilities(unlocks).filters ? [] : steps.filter((st) => st.outputs.length >= 2);
+}
+
 /** Lay every step out as blocks and pack them tightly on the ground (or as modules side by side, see moduleGroups) */
 export function generateModule(allSteps: ModuleStep[], given: ModuleOptions): GeneratedModule {
+    const unsortable = unsortableSteps(allSteps, given.unlocks);
+    if (unsortable.length)
+        throw new UnbuildableError(
+            `${unsortable.map((st) => `${st.itemName} (${getFootprint(st.deviceId)?.name ?? st.deviceId}) puts ${st.outputs.map((o) => o.itemName).join(" and ")} on one belt`).join("; ")}: taking them apart needs filters, which aren't unlocked yet`,
+        );
     // The top cell of a storey is taken by the ceiling in game: buildings and pipes stay below it
     const options = { ...given, maxHeight: given.maxHeight - CEILING_CELLS };
     const groups = moduleGroupsOf(allSteps, options.moduleGroups);

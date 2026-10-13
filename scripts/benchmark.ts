@@ -29,7 +29,7 @@ import itemsData from "../data/items.json";
 import recipesData from "../data/recipes.json";
 import unlocksData from "../data/building-unlocks.json";
 import { analyzeBelts } from "../engine/belt-analysis";
-import { DEFAULT_MODULE_OPTIONS, generateModule, moduleTooBig, type ModuleStep } from "../engine/build/generator";
+import { DEFAULT_MODULE_OPTIONS, generateModule, moduleTooBig, unsortableSteps, type ModuleStep } from "../engine/build/generator";
 import { validateLayout } from "../engine/build/layout";
 import { stepsFromReport } from "../engine/build/module-steps";
 import { MAX_LEVEL } from "../engine/build/unlocks";
@@ -73,6 +73,8 @@ interface Result extends Case {
     /** Fingerprint of the layout: equal means the same buildings at the same places */
     hash: string;
     error?: string;
+    /** The generator declined the plan (UnbuildableError): why */
+    rejected?: string;
 }
 
 /** No research; fuel and fertilizer made in the factory */
@@ -247,6 +249,8 @@ function makeCorpus(seed: number, count: number): Case[] {
 
 function runCase(c: Case): Result {
     const planned = stepsFor(c)!;
+    const reasons = unsortableSteps(planned.steps, { level: c.level });
+    if (reasons.length) return { ...c, rejected: reasons.map((st) => st.itemName).join(", ") } as Result;
     const started = performance.now();
     const mod = generateModule(planned.steps, { ...DEFAULT_MODULE_OPTIONS, beltSpeed: planned.report.beltSpeed, finalProducts: [c.item], unlocks: { level: c.level } });
     const ms = Math.round(performance.now() - started);
@@ -295,7 +299,7 @@ function runAll(cases: Case[], jobs: number): Promise<Result[]> {
             });
             done++;
             const r = results[k];
-            console.log(`[${done}/${cases.length}] ${label(c)}: ${r.error ? `error ${r.error}` : `${r.failed} failed, ${r.size.join("×")}, ${r.ms} ms`}`);
+            console.log(`[${done}/${cases.length}] ${label(c)}: ${r.error ? `error ${r.error}` : r.rejected ? `rejected (${r.rejected})` : `${r.failed} failed, ${r.size.join("×")}, ${r.ms} ms`}`);
         }
     };
     return Promise.all(Array.from({ length: jobs }, worker)).then(() => results);
@@ -311,6 +315,10 @@ function compare(before: Result[], after: Result[]) {
     for (const r of after) {
         const b = old.get(key(r));
         if (!b || b.error || r.error) continue;
+        if (b.rejected || r.rejected) {
+            if (b.rejected !== r.rejected) rows.push(`${key(r).padEnd(44)} ${b.rejected ? `rejected (${b.rejected})` : "built"} → ${r.rejected ? `rejected (${r.rejected})` : "built"}`);
+            continue;
+        }
         if (b.hash === r.hash) {
             same++;
             continue;
@@ -324,10 +332,11 @@ function compare(before: Result[], after: Result[]) {
         const d = (field: keyof Result) => (b[field] === r[field] ? `${r[field]}` : `${b[field]}→${r[field]}`);
         rows.push(`${key(r).padEnd(44)} failed ${d("failed").padEnd(7)} issues ${d("issues").padEnd(7)} area ${d("area").padEnd(11)} lifts ${d("lifts").padEnd(9)} belts ${d("belts").padEnd(11)} work ${d("work")}`);
     }
-    const sum = (rs: Result[], f: (r: Result) => number) => rs.filter((r) => !r.error).reduce((s, r) => s + f(r), 0);
+    const sum = (rs: Result[], f: (r: Result) => number) => rs.filter((r) => !r.error && !r.rejected).reduce((s, r) => s + f(r), 0);
     const total = (label: string, f: (r: Result) => number) => console.log(`${label.padEnd(16)} ${sum(before, f)} → ${sum(after, f)}`);
     rows.forEach((row) => console.log(row));
     console.log(`\n${after.length} cases: ${same} unchanged, ${better} better, ${worse} worse`);
+    console.log(`${"Rejected".padEnd(16)} ${before.filter((r) => r.rejected).length} → ${after.filter((r) => r.rejected).length}`);
     total("Failed belts", (r) => r.failed);
     total("Layout issues", (r) => r.issues);
     total("Cases broken", (r) => (r.failed + r.issues > 0 ? 1 : 0));
@@ -359,8 +368,9 @@ if (command === "case") {
     const results = await runAll(cases, Number(flag("jobs", String(Math.max(1, availableParallelism() - 2)))));
     mkdirSync(dirname(out), { recursive: true });
     writeFileSync(out, JSON.stringify(results, null, 2) + "\n");
-    const broken = results.filter((r) => r.error || r.failed + r.issues > 0).length;
-    console.log(`\n${results.length} cases, ${broken} broken: ${out}`);
+    const broken = results.filter((r) => r.error || (!r.rejected && r.failed + r.issues > 0)).length;
+    const rejected = results.filter((r) => r.rejected).length;
+    console.log(`\n${results.length} cases, ${broken} broken, ${rejected} rejected: ${out}`);
 } else if (command === "compare" && args[1] && args[2]) {
     compare(JSON.parse(readFileSync(args[1], "utf8")), JSON.parse(readFileSync(args[2], "utf8")));
 } else {
