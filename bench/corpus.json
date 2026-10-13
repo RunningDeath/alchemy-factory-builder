@@ -1,242 +1,834 @@
 [
   {
     "item": "Sage Powder",
-    "rate": 33
+    "level": 6,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 3.3
+  },
+  {
+    "item": "Sage Powder",
+    "level": 7,
+    "cauldron": true,
+    "fuel": "blastpotion",
+    "fertilizer": "catalyst2",
+    "rate": 3.3
   },
   {
     "item": "Plant Ash",
-    "rate": 12
+    "level": 5,
+    "cauldron": false,
+    "fuel": "cokepowder",
+    "fertilizer": "advancedfertilizer",
+    "rate": 2.3
+  },
+  {
+    "item": "Plant Ash",
+    "level": 6,
+    "cauldron": true,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 2.3
   },
   {
     "item": "Silver Coin",
-    "rate": 1
+    "level": 8,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 2
+  },
+  {
+    "item": "Silver Coin",
+    "level": 8,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 2
+  },
+  {
+    "item": "Gold Dust",
+    "level": 9,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 1.3
   },
   {
     "item": "Iron Amulet",
-    "rate": 9.6
+    "level": 8,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 1.6
+  },
+  {
+    "item": "Iron Amulet",
+    "level": 9,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 1.6
   },
   {
     "item": "Sapphire",
-    "rate": 0.45
+    "level": 7,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 0.4
+  },
+  {
+    "item": "Sapphire",
+    "level": 7,
+    "cauldron": true,
+    "fuel": "blastpotion",
+    "fertilizer": "catalyst2",
+    "rate": 0.4
   },
   {
     "item": "Dull Shard",
-    "rate": 24
+    "level": 9,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 16
   },
   {
     "item": "Mars",
-    "rate": 2.2
+    "level": 5,
+    "cauldron": false,
+    "fuel": "cokepowder",
+    "fertilizer": "advancedfertilizer",
+    "rate": 2.4
+  },
+  {
+    "item": "Mars",
+    "level": 6,
+    "cauldron": true,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 2.4
+  },
+  {
+    "item": "Alchemist's Sigh",
+    "level": 10,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 0.18
   },
   {
     "item": "Iron Sand",
-    "rate": 19
-  },
-  {
-    "item": "Healing Potion",
-    "rate": 6.6
-  },
-  {
-    "item": "Copper Coin",
-    "rate": 2.1
-  },
-  {
-    "item": "Unstable Catalyst",
-    "rate": 3.1
-  },
-  {
-    "item": "Flax",
-    "rate": 63
-  },
-  {
-    "item": "Wooden Pulley",
-    "rate": 11
-  },
-  {
-    "item": "Fruit Wine",
-    "rate": 5.5
-  },
-  {
-    "item": "Sulfur Powder",
-    "rate": 7.7
-  },
-  {
-    "item": "Brine",
-    "rate": 27
-  },
-  {
-    "item": "Gentian",
-    "rate": 39
-  },
-  {
-    "item": "Copper Amulet",
-    "rate": 3
-  },
-  {
-    "item": "Advanced Bandage",
-    "rate": 6.1
-  },
-  {
-    "item": "Charcoal",
-    "rate": 11
-  },
-  {
-    "item": "Strange Tide",
-    "rate": 2.8
-  },
-  {
-    "item": "Transformation Potion",
-    "rate": 3.4
-  },
-  {
-    "item": "Amethyst",
-    "rate": 5
-  },
-  {
-    "item": "Coal",
-    "rate": 47
-  },
-  {
-    "item": "Fairy Dust",
-    "rate": 9.8
-  },
-  {
-    "item": "Small Wooden Gear",
+    "level": 3,
+    "cauldron": false,
+    "fuel": "coal",
+    "fertilizer": "",
     "rate": 18
   },
   {
+    "item": "Iron Sand",
+    "level": 6,
+    "cauldron": true,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 18
+  },
+  {
+    "item": "Healing Potion",
+    "level": 7,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 1.3
+  },
+  {
+    "item": "Healing Potion",
+    "level": 8,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 1.3
+  },
+  {
+    "item": "Copper Coin",
+    "level": 8,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 2.4
+  },
+  {
+    "item": "Copper Coin",
+    "level": 9,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 2.4
+  },
+  {
+    "item": "Unstable Catalyst",
+    "level": 6,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 1.1
+  },
+  {
+    "item": "Unstable Catalyst",
+    "level": 7,
+    "cauldron": true,
+    "fuel": "blastpotion",
+    "fertilizer": "catalyst2",
+    "rate": 1.1
+  },
+  {
+    "item": "Flax",
+    "level": 4,
+    "cauldron": false,
+    "fuel": "cokepowder",
+    "fertilizer": "advancedfertilizer",
+    "rate": 4.3
+  },
+  {
+    "item": "Flax",
+    "level": 6,
+    "cauldron": true,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 4.3
+  },
+  {
+    "item": "Wooden Pulley",
+    "level": 7,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 3.3
+  },
+  {
+    "item": "Wooden Pulley",
+    "level": 8,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 3.3
+  },
+  {
+    "item": "Fruit Wine",
+    "level": 8,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 2.5
+  },
+  {
+    "item": "Fruit Wine",
+    "level": 9,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 2.5
+  },
+  {
+    "item": "Sulfur Powder",
+    "level": 3,
+    "cauldron": false,
+    "fuel": "coal",
+    "fertilizer": "",
+    "rate": 5.7
+  },
+  {
+    "item": "Sulfur Powder",
+    "level": 6,
+    "cauldron": true,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 5.7
+  },
+  {
+    "item": "Brine",
+    "level": 4,
+    "cauldron": false,
+    "fuel": "cokepowder",
+    "fertilizer": "advancedfertilizer",
+    "rate": 34
+  },
+  {
+    "item": "Brine",
+    "level": 6,
+    "cauldron": true,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 34
+  },
+  {
+    "item": "Ruby",
+    "level": 8,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 0.41
+  },
+  {
+    "item": "Flax Fiber",
+    "level": 6,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 2.7
+  },
+  {
+    "item": "Flax Fiber",
+    "level": 7,
+    "cauldron": true,
+    "fuel": "blastpotion",
+    "fertilizer": "catalyst2",
+    "rate": 2.7
+  },
+  {
+    "item": "Emerald",
+    "level": 10,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 0.14
+  },
+  {
+    "item": "Gentian",
+    "level": 4,
+    "cauldron": false,
+    "fuel": "cokepowder",
+    "fertilizer": "advancedfertilizer",
+    "rate": 0.87
+  },
+  {
+    "item": "Gentian",
+    "level": 6,
+    "cauldron": true,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 0.87
+  },
+  {
+    "item": "Copper Amulet",
+    "level": 9,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 0.5
+  },
+  {
+    "item": "Copper Amulet",
+    "level": 9,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 0.5
+  },
+  {
+    "item": "Advanced Bandage",
+    "level": 7,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 0.41
+  },
+  {
+    "item": "Advanced Bandage",
+    "level": 8,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 0.41
+  },
+  {
+    "item": "Charcoal",
+    "level": 9,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 3.5
+  },
+  {
+    "item": "Charcoal",
+    "level": 9,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 3.5
+  },
+  {
+    "item": "Strange Tide",
+    "level": 4,
+    "cauldron": false,
+    "fuel": "cokepowder",
+    "fertilizer": "advancedfertilizer",
+    "rate": 1.4
+  },
+  {
+    "item": "Strange Tide",
+    "level": 6,
+    "cauldron": true,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 1.4
+  },
+  {
+    "item": "Transformation Potion",
+    "level": 10,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 2.4
+  },
+  {
+    "item": "Transformation Potion",
+    "level": 10,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 2.4
+  },
+  {
+    "item": "Amethyst",
+    "level": 9,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 0.12
+  },
+  {
+    "item": "Amethyst",
+    "level": 9,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 0.12
+  },
+  {
+    "item": "Coal",
+    "level": 6,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 52
+  },
+  {
+    "item": "Coal",
+    "level": 8,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 52
+  },
+  {
+    "item": "Fairy Dust",
+    "level": 10,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 1.2
+  },
+  {
+    "item": "Fairy Dust",
+    "level": 10,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 1.2
+  },
+  {
+    "item": "Small Wooden Gear",
+    "level": 4,
+    "cauldron": false,
+    "fuel": "cokepowder",
+    "fertilizer": "advancedfertilizer",
+    "rate": 5.7
+  },
+  {
+    "item": "Small Wooden Gear",
+    "level": 7,
+    "cauldron": true,
+    "fuel": "blastpotion",
+    "fertilizer": "catalyst2",
+    "rate": 5.7
+  },
+  {
     "item": "Perfumed Soap Powder",
+    "level": 9,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 1.4
+  },
+  {
+    "item": "Perfumed Soap Powder",
+    "level": 9,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
     "rate": 1.4
   },
   {
     "item": "Sulfuric Acid",
-    "rate": 2.2
-  },
-  {
-    "item": "World Tree Vintage",
-    "rate": 0.37
-  },
-  {
-    "item": "Adamant",
+    "level": 7,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
     "rate": 3.6
   },
   {
+    "item": "Sulfuric Acid",
+    "level": 7,
+    "cauldron": true,
+    "fuel": "blastpotion",
+    "fertilizer": "catalyst2",
+    "rate": 3.6
+  },
+  {
+    "item": "Impure Gold Dust",
+    "level": 9,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 0.42
+  },
+  {
+    "item": "World Tree Vintage",
+    "level": 8,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 0.18
+  },
+  {
+    "item": "World Tree Vintage",
+    "level": 8,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 0.18
+  },
+  {
+    "item": "Luna",
+    "level": 10,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 0.76
+  },
+  {
+    "item": "Sol",
+    "level": 9,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 0.1
+  },
+  {
+    "item": "Adamant",
+    "level": 8,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 0.67
+  },
+  {
     "item": "Bronze Ingot",
-    "rate": 2.4
+    "level": 8,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 2
+  },
+  {
+    "item": "Bronze Ingot",
+    "level": 9,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 2
   },
   {
     "item": "Sulfur",
-    "rate": 24
+    "level": 8,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 6.6
+  },
+  {
+    "item": "Sulfur",
+    "level": 9,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 6.6
   },
   {
     "item": "Lapis Lazuli",
-    "rate": 1.3
+    "level": 10,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 0.67
+  },
+  {
+    "item": "Lapis Lazuli",
+    "level": 10,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 0.67
   },
   {
     "item": "Topaz",
+    "level": 10,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 0.6
+  },
+  {
+    "item": "Topaz",
+    "level": 10,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 0.6
+  },
+  {
+    "item": "Pocket Watch",
+    "level": 6,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
     "rate": 1.6
   },
   {
     "item": "Pocket Watch",
-    "rate": 0.53
+    "level": 6,
+    "cauldron": true,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 1.6
   },
   {
     "item": "Soap",
-    "rate": 3.3
+    "level": 7,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 3
+  },
+  {
+    "item": "Soap",
+    "level": 8,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 3
   },
   {
     "item": "Broken Shard",
-    "rate": 29
+    "level": 7,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 25
   },
   {
     "item": "Copper Ingot",
-    "rate": 0.85
+    "level": 5,
+    "cauldron": false,
+    "fuel": "cokepowder",
+    "fertilizer": "advancedfertilizer",
+    "rate": 0.68
+  },
+  {
+    "item": "Copper Ingot",
+    "level": 6,
+    "cauldron": true,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 0.68
+  },
+  {
+    "item": "Fertile Catalyst",
+    "level": 8,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 2.3
   },
   {
     "item": "Iron Nails",
-    "rate": 12
+    "level": 7,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 0.75
+  },
+  {
+    "item": "Iron Nails",
+    "level": 8,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 0.75
   },
   {
     "item": "Linen Thread",
-    "rate": 21
+    "level": 8,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 2.3
+  },
+  {
+    "item": "Linen Thread",
+    "level": 9,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 2.3
   },
   {
     "item": "Black Powder",
-    "rate": 2.5
-  },
-  {
-    "item": "Copper Bearing",
-    "rate": 6.2
-  },
-  {
-    "item": "Silver Ingot",
-    "rate": 1.5
-  },
-  {
-    "item": "Chamomile",
-    "rate": 36
-  },
-  {
-    "item": "Silver Amulet",
-    "rate": 0.35
-  },
-  {
-    "item": "Refined Sand 4",
-    "rate": 7.7
-  },
-  {
-    "item": "Silver Powder",
-    "rate": 0.69
-  },
-  {
-    "item": "Salt",
-    "rate": 60
-  },
-  {
-    "item": "Redcurrant",
-    "rate": 17
-  },
-  {
-    "item": "Refined Sand 3",
+    "level": 8,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
     "rate": 7
   },
   {
-    "item": "Copper Powder",
-    "rate": 6.5
+    "item": "Black Powder",
+    "level": 8,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 7
   },
   {
-    "item": "Refined Sand 2",
-    "rate": 18
+    "item": "Crude Gold Dust",
+    "level": 8,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 1.8
   },
   {
-    "item": "Charisma Potion",
+    "item": "Copper Bearing",
+    "level": 9,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
     "rate": 1.2
   },
   {
-    "item": "Large Wooden Gear",
-    "rate": 5.5
+    "item": "Copper Bearing",
+    "level": 9,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 1.2
   },
   {
-    "item": "Steel Ingot",
-    "rate": 3.8
+    "item": "Silver Ingot",
+    "level": 10,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 0.31
   },
   {
-    "item": "Yeast Powder",
-    "rate": 5.3
+    "item": "Silver Ingot",
+    "level": 10,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 0.31
   },
   {
-    "item": "Bronze Rivet",
-    "rate": 2.1
+    "item": "Blast Potion",
+    "level": 7,
+    "cauldron": true,
+    "fuel": "blastpotion",
+    "fertilizer": "catalyst2",
+    "rate": 2.8
   },
   {
-    "item": "Limewater",
-    "rate": 3.8
+    "item": "Pure Gold Dust",
+    "level": 10,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 0.25
   },
   {
-    "item": "Crude Silver Powder",
-    "rate": 1.7
+    "item": "Panacea Potion",
+    "level": 10,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 0.12
   },
   {
-    "item": "Moonlit Soap",
-    "rate": 0.36
+    "item": "Chamomile",
+    "level": 6,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 4.3
+  },
+  {
+    "item": "Chamomile",
+    "level": 7,
+    "cauldron": true,
+    "fuel": "blastpotion",
+    "fertilizer": "catalyst2",
+    "rate": 4.3
+  },
+  {
+    "item": "Silver Amulet",
+    "level": 10,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 0.39
+  },
+  {
+    "item": "Silver Amulet",
+    "level": 10,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 0.39
+  },
+  {
+    "item": "Refined Sand 4",
+    "level": 8,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 8.8
+  },
+  {
+    "item": "Silver Powder",
+    "level": 9,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 0.73
+  },
+  {
+    "item": "Silver Powder",
+    "level": 9,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 0.73
   }
 ]

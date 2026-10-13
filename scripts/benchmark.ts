@@ -7,7 +7,10 @@
  *   bun run scripts/benchmark.ts corpus [--seed 1] [--count 60]
  *       Picks random target products (seeded: the same seed gives the same corpus) and a
  *       rate per product that needs a random number of machines, so later products in a
- *       chain get lower rates. Products whose plan has the same structure as one already
+ *       chain get lower rates. Each product is built at a random level between the first
+ *       that makes it and the last, with that level's buildings and its best fuel and
+ *       fertilizer (highest heat and nutrient value the factory can make by then; raw
+ *       materials are never fuel), with the cauldron off and (once unlocked) on. Products whose plan has the same structure as one already
  *       taken (same machines, connections and rates, other items) are skipped. Writes
  *       bench/corpus.json; commit it, it is the reference.
  *   bun run scripts/benchmark.ts run [--out bench/results/<name>.json] [--jobs 8] [--only <item>]
@@ -24,10 +27,12 @@ import { availableParallelism } from "node:os";
 import { dirname } from "node:path";
 import itemsData from "../data/items.json";
 import recipesData from "../data/recipes.json";
+import unlocksData from "../data/building-unlocks.json";
 import { analyzeBelts } from "../engine/belt-analysis";
 import { DEFAULT_MODULE_OPTIONS, generateModule, moduleTooBig, type ModuleStep } from "../engine/build/generator";
 import { validateLayout } from "../engine/build/layout";
 import { stepsFromReport } from "../engine/build/module-steps";
+import { MAX_LEVEL } from "../engine/build/unlocks";
 import { calculatePlan } from "../engine/planner";
 import type { PlannerConfig } from "../engine/types";
 
@@ -38,13 +43,27 @@ const MACHINES = { min: 8, max: 80 };
 interface Case {
     item: string;
     rate: number;
+    /** Player level: the buildings the generator may use, and the fuel and fertilizer */
+    level: number;
+    /** Cauldron mixes allowed (from its unlock level on; the advanced one from its own) */
+    cauldron: boolean;
+    /** Best fuel and fertilizer made at this level (item ids; "" for none), see suppliesAt */
+    fuel: string;
+    fertilizer: string;
 }
+
+const label = (c: Pick<Case, "item" | "rate" | "level" | "cauldron">) => `${c.item}@${c.rate} L${c.level}${c.cauldron ? " cauldron" : ""}`;
+const unlockLevel = (id: string) => (unlocksData as Record<string, { level: number }>)[id]?.level ?? Infinity;
+const CAULDRON_LEVEL = unlockLevel("cauldron");
+const ADVANCED_CAULDRON_LEVEL = unlockLevel("advanced-cauldron");
 
 interface Result extends Case {
     machines: number;
     steps: number;
     failed: number;
     issues: number;
+    /** Layout issues by kind (collision, unsupported, unheated, ...) */
+    issueKinds?: Record<string, number>;
     size: [number, number, number];
     area: number;
     lifts: number;
@@ -56,7 +75,7 @@ interface Result extends Case {
     error?: string;
 }
 
-/** No research; fuel and fertilizer made in the factory (the planner's defaults) */
+/** No research; fuel and fertilizer made in the factory */
 const config = (c: Case): PlannerConfig => ({
     targets: [{ item: c.item, rate: c.rate }],
     availableResources: [],
@@ -70,10 +89,12 @@ const config = (c: Case): PlannerConfig => ({
     negotiationSkill: 0,
     customerMgmt: 0,
     relicKnowledge: 0,
-    selectedFuel: "coal",
-    selectedFertilizer: "",
+    selectedFuel: c.fuel,
+    selectedFertilizer: c.fertilizer,
     selfFuel: true,
     selfFertilizer: true,
+    useCauldron: c.cauldron,
+    useAdvancedCauldron: c.cauldron && c.level >= ADVANCED_CAULDRON_LEVEL,
     fertilizerReserve: 0.25,
     planParallelLines: true,
     machineRounding: "up",
@@ -131,8 +152,44 @@ function random(seed: number) {
 /** Two significant digits */
 const roundRate = (r: number) => Number(r.toPrecision(2));
 
+/** Level a plan needs: the highest unlock among its machines (null: it can't be made) */
+function levelNeeded(c: Case): number | null {
+    const planned = stepsFor(c);
+    if (!planned?.steps.length) return null;
+    return Math.max(1, ...planned.steps.map((st) => unlockLevel(st.deviceId)));
+}
+
+type Supplies = Pick<Case, "fuel" | "fertilizer">;
+
+/**
+ * Best fuel and fertilizer per level: the highest heat and nutrient value among those the
+ * factory can make by then. Raw materials (bought or mined) are never fuel.
+ */
+function suppliesAt(): (level: number, cauldron: boolean) => Supplies {
+    type Candidate = { id: string; heat: number; nutrients: number; level: number };
+    const items = itemsData as { id: string; name: string; heat_value?: number; nutrient_value?: number; purchasable?: boolean }[];
+    const table = new Map<boolean, Candidate[]>();
+    for (const cauldron of [false, true]) {
+        const candidates: Candidate[] = [];
+        for (const i of items.filter((i) => (i.heat_value || i.nutrient_value) && !i.purchasable)) {
+            // Its own heaters burn wooden boards (from bought wood): only the machines count here
+            const level = levelNeeded({ item: i.name, rate: 1, level: MAX_LEVEL, cauldron, fuel: "woodboard", fertilizer: "" });
+            if (level !== null) candidates.push({ id: i.id, heat: i.heat_value ?? 0, nutrients: i.nutrient_value ?? 0, level });
+        }
+        table.set(cauldron, candidates);
+    }
+    return (level, cauldron) => {
+        const ready = table.get(cauldron && level >= CAULDRON_LEVEL)!.filter((c) => c.level <= level);
+        const best = (value: (c: Candidate) => number) => ready.filter((c) => value(c) > 0).sort((a, b) => value(b) - value(a))[0]?.id ?? "";
+        return { fuel: best((c) => c.heat), fertilizer: best((c) => c.nutrients) };
+    };
+}
+
 function makeCorpus(seed: number, count: number): Case[] {
     const rand = random(seed);
+    const supplies = suppliesAt();
+    for (let level = 1; level <= MAX_LEVEL; level++)
+        console.log(`Level ${level}: ${JSON.stringify(supplies(level, false))}${level >= CAULDRON_LEVEL ? `, cauldron ${JSON.stringify(supplies(level, true))}` : ""}`);
     const made = new Set((recipesData as { outputs: { id: string }[] }[]).flatMap((r) => r.outputs.map((o) => o.id)));
     const items = (itemsData as { id: string; name: string }[]).filter((i) => made.has(i.id));
     // Shuffle (Fisher-Yates), then take products until there are enough that plan
@@ -142,28 +199,48 @@ function makeCorpus(seed: number, count: number): Case[] {
     }
     const cases: Case[] = [];
     const structures = new Map<string, string>();
+    let products = 0;
     for (const item of items) {
-        if (cases.length >= count) break;
+        if (products >= count) break;
         const want = MACHINES.min + Math.floor(rand() * (MACHINES.max - MACHINES.min + 1));
-        try {
-            // Machines per 1/min, then the rate that needs about `want` machines
-            const unit = stepsFor({ item: item.name, rate: 1 });
-            if (!unit?.steps.length) continue;
-            const structure = structureOf(unit.steps);
-            if (structures.has(structure)) {
-                console.log(`${item.name}: same structure as ${structures.get(structure)}, skipped`);
-                continue;
+        // Where between the first level that makes it and the last the product is built
+        const progress = rand();
+        // One rate per product (from the first variant), so its variants compare
+        let rate = 0;
+        let taken = 0;
+        for (const cauldron of [false, true]) {
+            try {
+                // The first level that makes the product with that level's own fuel and fertilizer
+                let first = 0;
+                for (let level = cauldron ? CAULDRON_LEVEL : 1; level <= MAX_LEVEL && !first; level++) {
+                    const needed = levelNeeded({ item: item.name, rate: 1, level, cauldron, ...supplies(level, cauldron) });
+                    if (needed !== null && needed <= level) first = level;
+                }
+                if (!first) continue;
+                const level = first + Math.floor(progress * (MAX_LEVEL - first + 1));
+                const base = { item: item.name, level, cauldron, ...supplies(level, cauldron) };
+                // Machines per 1/min, then the rate that needs about `want` machines
+                const unit = stepsFor({ ...base, rate: 1 });
+                if (!unit?.steps.length) continue;
+                // The level counts too: it decides which buildings the generator has
+                const structure = `L${level}|${structureOf(unit.steps)}`;
+                if (structures.has(structure)) {
+                    console.log(`${label({ ...base, rate: 1 })}: same structure as ${structures.get(structure)}, skipped`);
+                    continue;
+                }
+                const perUnit = unit.steps.reduce((sum, st) => sum + st.machines, 0);
+                if (!(perUnit > 0)) continue;
+                rate ||= roundRate(Math.max(0.1, want / perUnit));
+                const planned = stepsFor({ ...base, rate });
+                if (!planned?.steps.length || moduleTooBig(planned.steps)) continue;
+                cases.push({ ...base, rate });
+                structures.set(structure, label({ ...base, rate }));
+                taken++;
+            } catch {
+                // Products the planner can't make (only bought, missing recipes) aren't cases
             }
-            const perUnit = unit.steps.reduce((sum, st) => sum + st.machines, 0);
-            if (!(perUnit > 0)) continue;
-            const rate = roundRate(Math.max(0.1, want / perUnit));
-            const planned = stepsFor({ item: item.name, rate });
-            if (!planned?.steps.length || moduleTooBig(planned.steps)) continue;
-            cases.push({ item: item.name, rate });
-            structures.set(structure, item.name);
-        } catch {
-            // Products the planner can't make (only bought, missing recipes) aren't cases
         }
+        if (taken) products++;
     }
     return cases;
 }
@@ -171,15 +248,17 @@ function makeCorpus(seed: number, count: number): Case[] {
 function runCase(c: Case): Result {
     const planned = stepsFor(c)!;
     const started = performance.now();
-    const mod = generateModule(planned.steps, { ...DEFAULT_MODULE_OPTIONS, beltSpeed: planned.report.beltSpeed, finalProducts: [c.item] });
+    const mod = generateModule(planned.steps, { ...DEFAULT_MODULE_OPTIONS, beltSpeed: planned.report.beltSpeed, finalProducts: [c.item], unlocks: { level: c.level } });
     const ms = Math.round(performance.now() - started);
+    const issues = validateLayout(mod.placements);
     const shape = mod.placements.map((p) => [p.id, p.x, p.y, p.z, p.rot].join(",")).sort().join(";");
     return {
         ...c,
         machines: machinesOf(planned.steps),
         steps: planned.steps.length,
         failed: mod.routes.filter((r) => !r.ok).length,
-        issues: validateLayout(mod.placements).length,
+        issues: issues.length,
+        issueKinds: issues.reduce<Record<string, number>>((m, i) => ((m[i.kind] = (m[i.kind] ?? 0) + 1), m), {}),
         size: mod.size,
         area: mod.size[0] * mod.size[1],
         lifts: mod.placements.filter((p) => p.id === "conveyer-lift-upwards" || p.id === "conveyer-lift-downwards").length,
@@ -216,14 +295,14 @@ function runAll(cases: Case[], jobs: number): Promise<Result[]> {
             });
             done++;
             const r = results[k];
-            console.log(`[${done}/${cases.length}] ${c.item} ${c.rate}/min: ${r.error ? `error ${r.error}` : `${r.failed} failed, ${r.size.join("×")}, ${r.ms} ms`}`);
+            console.log(`[${done}/${cases.length}] ${label(c)}: ${r.error ? `error ${r.error}` : `${r.failed} failed, ${r.size.join("×")}, ${r.ms} ms`}`);
         }
     };
     return Promise.all(Array.from({ length: jobs }, worker)).then(() => results);
 }
 
 function compare(before: Result[], after: Result[]) {
-    const key = (r: Case) => `${r.item}@${r.rate}`;
+    const key = label;
     const old = new Map(before.map((r) => [key(r), r]));
     const rows: string[] = [];
     let better = 0;
@@ -243,7 +322,7 @@ function compare(before: Result[], after: Result[]) {
         if (sign >= 0 && ra[sign] < rb[sign]) better++;
         else if (sign >= 0) worse++;
         const d = (field: keyof Result) => (b[field] === r[field] ? `${r[field]}` : `${b[field]}→${r[field]}`);
-        rows.push(`${key(r).padEnd(34)} failed ${d("failed").padEnd(7)} issues ${d("issues").padEnd(7)} area ${d("area").padEnd(11)} lifts ${d("lifts").padEnd(9)} belts ${d("belts").padEnd(11)} work ${d("work")}`);
+        rows.push(`${key(r).padEnd(44)} failed ${d("failed").padEnd(7)} issues ${d("issues").padEnd(7)} area ${d("area").padEnd(11)} lifts ${d("lifts").padEnd(9)} belts ${d("belts").padEnd(11)} work ${d("work")}`);
     }
     const sum = (rs: Result[], f: (r: Result) => number) => rs.filter((r) => !r.error).reduce((s, r) => s + f(r), 0);
     const total = (label: string, f: (r: Result) => number) => console.log(`${label.padEnd(16)} ${sum(before, f)} → ${sum(after, f)}`);
