@@ -205,6 +205,8 @@ const TIME_BUDGET_MS = 60000;
 const HARD_LIMIT_FACTOR = 1;
 /** Share of the time stacked towers may take while belts still fail: the rest is kept for side by side */
 const STACK_SHARE = 0.6;
+/** Side-by-side layouts (the first corridor's) that run even past the limit while belts fail */
+const FALLBACK_ATTEMPTS = 3;
 
 /** Free cells around each block, so belts can run between blocks; wider when routing fails */
 const CORRIDORS = [1, 2, 3];
@@ -1355,6 +1357,7 @@ function generateBlocksWith(allSteps: ModuleStep[], options: ModuleOptions, budg
                 // like grinders don't: blocks of different products in one tower need a lift per level
                 kind: bigMachine(b.info.deviceId) ? b.info.deviceId : undefined,
                 small: !bigMachine(b.info.deviceId) && b.info.deviceId !== PURCHASING_PORTAL,
+                stage: flow[i].stage,
             })),
             { maxHeight: options.maxHeight, related, makeUid: () => nextUid("t") },
         );
@@ -1391,6 +1394,8 @@ function generateBlocksWith(allSteps: ModuleStep[], options: ModuleOptions, budg
     const started = Date.now();
     let attempt = 0;
     let retries = 0;
+    /** Side-by-side layouts tried so far: the first corridor's run even past the time limit while belts fail */
+    let sideBySide = 0;
     // Stacked towers first. When some belts don't fit, only the blocks they belong to leave
     // the towers and the rest tries again; side by side for everything as the last resort
     for (;;) {
@@ -1402,7 +1407,9 @@ function generateBlocksWith(allSteps: ModuleStep[], options: ModuleOptions, budg
             // Long enough: settle for the best layout that routes everything
             if (best?.routes.every((r) => r.ok) && Date.now() - started > budgetMs) break;
             // Even when no layout routes everything yet: settle for the best one after a while
-            if (best && Date.now() - started > hardLimitMs) break;
+            const owed = !stacked && sideBySide < FALLBACK_ATTEMPTS && !best?.routes.every((r) => r.ok);
+            if (best && Date.now() - started > hardLimitMs && !owed) break;
+            if (!stacked) sideBySide++;
             if (stacked && best && Date.now() - started > stackLimitMs) break;
             const label = `Layout ${attempt + 1} of up to ${total}${stacked ? " (stacked)" : ""}: routing belts`;
             const base = attempt++;
