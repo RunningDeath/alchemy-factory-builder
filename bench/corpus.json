@@ -148,6 +148,10 @@
     "rate": 29
   },
   {
+    "item": "Copper Ingot",
+    "rate": 0.85
+  },
+  {
     "item": "Iron Nails",
     "rate": 12
   },
@@ -160,8 +164,16 @@
     "rate": 2.5
   },
   {
+    "item": "Copper Bearing",
+    "rate": 6.2
+  },
+  {
     "item": "Silver Ingot",
     "rate": 1.5
+  },
+  {
+    "item": "Chamomile",
+    "rate": 36
   },
   {
     "item": "Silver Amulet",
@@ -178,6 +190,10 @@
   {
     "item": "Salt",
     "rate": 60
+  },
+  {
+    "item": "Redcurrant",
+    "rate": 17
   },
   {
     "item": "Refined Sand 3",
@@ -208,35 +224,19 @@
     "rate": 5.3
   },
   {
+    "item": "Bronze Rivet",
+    "rate": 2.1
+  },
+  {
     "item": "Limewater",
     "rate": 3.8
   },
   {
-    "item": "Moonlit Soap",
-    "rate": 0.36
-  },
-  {
-    "item": "Steel Gear",
-    "rate": 1.5
-  },
-  {
-    "item": "Vitality Potion",
+    "item": "Crude Silver Powder",
     "rate": 1.7
   },
   {
-    "item": "Impure Silver Powder",
-    "rate": 0.7
-  },
-  {
-    "item": "Perfect Diamond",
-    "rate": 1.1
-  },
-  {
-    "item": "Soap Powder",
-    "rate": 9.4
-  },
-  {
-    "item": "Aqua Vitae",
-    "rate": 7.1
+    "item": "Moonlit Soap",
+    "rate": 0.36
   }
 ]

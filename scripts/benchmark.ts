@@ -8,7 +8,7 @@
  *       Picks random target products (seeded: the same seed gives the same corpus) and a
  *       rate per product that needs a random number of machines, so later products in a
  *       chain get lower rates. Products whose plan has the same structure as one already
- *       taken (same machines and connections, other items) are skipped. Writes
+ *       taken (same machines, connections and rates, other items) are skipped. Writes
  *       bench/corpus.json; commit it, it is the reference.
  *   bun run scripts/benchmark.ts run [--out bench/results/<name>.json] [--jobs 8] [--only <item>]
  *       Generates a module for every corpus case (no research, fuel and fertilizer made in
@@ -89,21 +89,25 @@ function stepsFor(c: Case) {
 
 /**
  * What the generator sees of a plan, without item names: machines, how steps feed each
- * other, fluids and heating. Products with the same structure (iron and copper ingots: ore
- * into a smelter) give the generator the same problem, so the corpus keeps only one
+ * other, the rates per machine (a nursery's fertilizer use), each step's share of the
+ * machines, fluids and heating. Products with the same structure give the generator the
+ * same problem, so the corpus keeps only one
  */
 function structureOf(steps: ModuleStep[]): string {
     const ids = new Map<string, number>();
     const id = (item: string) => (ids.has(item) ? ids.get(item)! : (ids.set(item, ids.size), ids.size - 1));
+    const flows = (fs: { itemName: string; perMachineRate: number }[]) => fs.map((f) => `${id(f.itemName)}@${f.perMachineRate.toPrecision(3)}`).join("+");
+    const total = steps.reduce((sum, st) => sum + st.machines, 0);
     return steps
         .map((st) =>
             [
                 st.deviceId,
-                st.heating?.kind ?? "",
-                st.inputs.map((f) => id(f.itemName)).join("+"),
-                st.outputs.map((f) => id(f.itemName)).join("+"),
-                (st.fluids?.inputs ?? []).map((f) => id(f.itemName)).join("+"),
-                (st.fluids?.outputs ?? []).map((f) => id(f.itemName)).join("+"),
+                (st.machines / total).toFixed(2),
+                st.heating ? `${st.heating.kind}@${st.heating.fuelRate.toPrecision(3)}` : "",
+                flows(st.inputs),
+                flows(st.outputs),
+                flows(st.fluids?.inputs ?? []),
+                flows(st.fluids?.outputs ?? []),
                 st.starterBox ? "starter" : "",
             ].join("/"),
         )
