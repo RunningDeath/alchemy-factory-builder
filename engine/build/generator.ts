@@ -203,6 +203,8 @@ const PEER_FLOOR_SLACK = 1.1;
 const TIME_BUDGET_MS = 60000;
 /** Past this many budgets the best layout so far is taken, belts routed or not */
 const HARD_LIMIT_FACTOR = 1;
+/** Share of the time stacked towers may take while belts still fail: the rest is kept for side by side */
+const STACK_SHARE = 0.6;
 
 /** Free cells around each block, so belts can run between blocks; wider when routing fails */
 const CORRIDORS = [1, 2, 3];
@@ -1382,6 +1384,8 @@ function generateBlocksWith(allSteps: ModuleStep[], options: ModuleOptions, budg
     };
     // Past this, take the best layout so far even with belts missing
     const hardLimitMs = budgetMs * HARD_LIMIT_FACTOR;
+    // Towers stop here while belts fail, so side by side (often routing everything) still gets its turn
+    const stackLimitMs = hardLimitMs * STACK_SHARE;
     const towerAttempts = attempts.filter(([c]) => c <= TOWER_MAX_CORRIDOR);
     const total = (towers.length < singles.length ? towerAttempts.length * (STACK_RETRIES + 1) : 0) + attempts.length;
     const started = Date.now();
@@ -1399,6 +1403,7 @@ function generateBlocksWith(allSteps: ModuleStep[], options: ModuleOptions, budg
             if (best?.routes.every((r) => r.ok) && Date.now() - started > budgetMs) break;
             // Even when no layout routes everything yet: settle for the best one after a while
             if (best && Date.now() - started > hardLimitMs) break;
+            if (stacked && best && Date.now() - started > stackLimitMs) break;
             const label = `Layout ${attempt + 1} of up to ${total}${stacked ? " (stacked)" : ""}: routing belts`;
             const base = attempt++;
             const onProgress = options.onProgress && ((f: number) => options.onProgress!(Math.min(0.99, (base + f) / total), label));
@@ -1416,6 +1421,10 @@ function generateBlocksWith(allSteps: ModuleStep[], options: ModuleOptions, budg
             if (mode === "packed" && best.routes.every((r) => r.ok)) break;
         }
         if (best?.routes.every((r) => r.ok) || !stacked || Date.now() - started > hardLimitMs) break;
+        if (Date.now() - started > stackLimitMs) {
+            towers = singles;
+            continue;
+        }
         const inTower = sameTowerFailures(bestOfSet!, set);
         const up = upFailures(bestOfSet!, set);
         const failing =
