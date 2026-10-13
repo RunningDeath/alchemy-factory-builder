@@ -7,7 +7,9 @@
  *   bun run scripts/benchmark.ts corpus [--seed 1] [--count 60]
  *       Picks random target products (seeded: the same seed gives the same corpus) and a
  *       rate per product that needs a random number of machines, so later products in a
- *       chain get lower rates. Writes bench/corpus.json; commit it, it is the reference.
+ *       chain get lower rates. Products whose plan has the same structure as one already
+ *       taken (same machines and connections, other items) are skipped. Writes
+ *       bench/corpus.json; commit it, it is the reference.
  *   bun run scripts/benchmark.ts run [--out bench/results/<name>.json] [--jobs 8] [--only <item>]
  *       Generates a module for every corpus case (no research, fuel and fertilizer made in
  *       the factory) and records failed belts, layout issues, size, lifts, belts, routing
@@ -23,7 +25,7 @@ import { dirname } from "node:path";
 import itemsData from "../data/items.json";
 import recipesData from "../data/recipes.json";
 import { analyzeBelts } from "../engine/belt-analysis";
-import { DEFAULT_MODULE_OPTIONS, generateModule, moduleTooBig } from "../engine/build/generator";
+import { DEFAULT_MODULE_OPTIONS, generateModule, moduleTooBig, type ModuleStep } from "../engine/build/generator";
 import { validateLayout } from "../engine/build/layout";
 import { stepsFromReport } from "../engine/build/module-steps";
 import { calculatePlan } from "../engine/planner";
@@ -85,6 +87,29 @@ function stepsFor(c: Case) {
     return { report, steps: stepsFromReport(report) };
 }
 
+/**
+ * What the generator sees of a plan, without item names: machines, how steps feed each
+ * other, fluids and heating. Products with the same structure (iron and copper ingots: ore
+ * into a smelter) give the generator the same problem, so the corpus keeps only one
+ */
+function structureOf(steps: ModuleStep[]): string {
+    const ids = new Map<string, number>();
+    const id = (item: string) => (ids.has(item) ? ids.get(item)! : (ids.set(item, ids.size), ids.size - 1));
+    return steps
+        .map((st) =>
+            [
+                st.deviceId,
+                st.heating?.kind ?? "",
+                st.inputs.map((f) => id(f.itemName)).join("+"),
+                st.outputs.map((f) => id(f.itemName)).join("+"),
+                (st.fluids?.inputs ?? []).map((f) => id(f.itemName)).join("+"),
+                (st.fluids?.outputs ?? []).map((f) => id(f.itemName)).join("+"),
+                st.starterBox ? "starter" : "",
+            ].join("/"),
+        )
+        .join("|");
+}
+
 const machinesOf = (steps: { machines: number }[]) => steps.reduce((sum, st) => sum + Math.ceil(st.machines), 0);
 
 /** Small seeded generator (mulberry32): the same seed gives the same corpus */
@@ -112,6 +137,7 @@ function makeCorpus(seed: number, count: number): Case[] {
         [items[i], items[j]] = [items[j], items[i]];
     }
     const cases: Case[] = [];
+    const structures = new Map<string, string>();
     for (const item of items) {
         if (cases.length >= count) break;
         const want = MACHINES.min + Math.floor(rand() * (MACHINES.max - MACHINES.min + 1));
@@ -119,12 +145,18 @@ function makeCorpus(seed: number, count: number): Case[] {
             // Machines per 1/min, then the rate that needs about `want` machines
             const unit = stepsFor({ item: item.name, rate: 1 });
             if (!unit?.steps.length) continue;
+            const structure = structureOf(unit.steps);
+            if (structures.has(structure)) {
+                console.log(`${item.name}: same structure as ${structures.get(structure)}, skipped`);
+                continue;
+            }
             const perUnit = unit.steps.reduce((sum, st) => sum + st.machines, 0);
             if (!(perUnit > 0)) continue;
             const rate = roundRate(Math.max(0.1, want / perUnit));
             const planned = stepsFor({ item: item.name, rate });
             if (!planned?.steps.length || moduleTooBig(planned.steps)) continue;
             cases.push({ item: item.name, rate });
+            structures.set(structure, item.name);
         } catch {
             // Products the planner can't make (only bought, missing recipes) aren't cases
         }
