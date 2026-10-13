@@ -726,6 +726,9 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
             }
             const cells: Cell[] = [start, add(start, dir)].flatMap((c) => [c, [c[0], c[1], c[2] + 1] as Cell]);
             if (![...leadCells, ...cells].every(free)) continue;
+            // Its bottom cells and the belt leading to it need supports down to the ground (not
+            // onto a machine that can't carry them)
+            if (![...leadCells, start, add(start, dir)].every((c) => supportCost(occupancy, c[0], c[1], c[2]) !== null)) continue;
             const xs = cells.map((c) => c[0]);
             const ys = cells.map((c) => c[1]);
             // Unrotated: in on the left, both outputs on the right (lower first, upper second)

@@ -54,9 +54,10 @@ export function supportCost(occupancy: Occupancy, x: number, y: number, z: numbe
     let count = 0;
     for (let fz = z - 1; fz >= groundZ; fz--) {
         if (isSupported(occupancy, x, y, fz + 1, groundZ)) return count;
-        // A lab stand uses the top and side layers of the cell
-        const blocked = (occupancy.get(cellKey(x, y, fz)) ?? []).some((o) => (o.layers & 12) !== 0);
-        if (blocked) return null;
+        // Only where supportColumn can put one: a lab stand or wood block that fits the cell
+        // (a machine's lower layers left a lab stand's room in the old check, not a support)
+        const fitsHere = [FRAME_ID, BLOCK_ID].some((id) => fits(occupancy, { uid: "", id, x, y, z: fz, rot: 0 }));
+        if (!fitsHere) return null;
         count++;
     }
     return count;

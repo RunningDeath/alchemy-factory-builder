@@ -32,4 +32,14 @@ describe("stepsFromReport", () => {
     crucibles.forEach((s) => expect(s.heating).toMatchObject({ kind: "stove", fuelItem: "Coal" }));
     expect(crucibles.every((s) => s.heating!.fuelRate > 0)).toBe(true);
   });
+
+  test("with a strong fuel (panacea) every heated machine still gets the selected fuel and a fuel belt", () => {
+    const cfg: PlannerConfig = { ...config, targets: [{ item: "Copper Coin", rate: 1 }], selectedFuel: "panaceaelixir", selectedFertilizer: "panaceaelixir", selfFertilizer: true, useCauldron: true, useAdvancedCauldron: true };
+    const report = analyzeBelts(calculatePlan(cfg), cfg, { planParallelLines: true, machineRounding: "up" });
+    const heated = stepsFromReport(report, cfg.selectedFuel).filter((s) => ["crucible", "alembic", "advanced-alembic", "cauldron", "advanced-cauldron", "iron-smelter"].includes(s.deviceId));
+    expect(heated.length).toBeGreaterThan(0);
+    // Not a byproduct that happens to share the belt (gentian for aqua vitae), not nothing
+    heated.forEach((s) => expect(s.heating).toMatchObject({ fuelItem: "Panacea Potion" }));
+    heated.forEach((s) => expect(s.heating!.fuelRate).toBeGreaterThanOrEqual(0.01));
+  });
 });
