@@ -108,6 +108,13 @@ const LIFT = {
 
 const BELT_LAYERS = 3; // bottom + middle
 const MAX_EXPANSIONS = 200_000;
+
+/**
+ * Search steps done so far, over all routing: the generator's measure of effort. Unlike a
+ * clock it is the same on every machine, so the same plan always gives the same module.
+ */
+let searchSteps = 0;
+export const routingWork = () => searchSteps;
 /** A lift costs as much as 8 belt cells: fewer lifts, but no long detours around blocks either */
 const LIFT_COST = 8;
 /** Per support cell under a raised belt or lift: tall columns turn into walls, so stay low and lift late */
@@ -493,6 +500,7 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
 
         let expansions = 0;
         while (open.size > 0 && expansions++ < MAX_EXPANSIONS) {
+            searchSteps++;
             const cur = open.pop();
             const stateKey = `${keyOf(cur.cell)}:${cur.heading}`;
             if ((best.get(stateKey) ?? Infinity) <= cur.g - 1e-9) continue;

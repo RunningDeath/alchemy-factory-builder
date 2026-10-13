@@ -282,6 +282,30 @@ describe("separate inputs, filters and heating", () => {
   });
 });
 
+describe("determinism", () => {
+  test("the same plan gives the same module, run after run", () => {
+    const steps = [
+      step({
+        deviceId: "athanor",
+        machines: 4,
+        inputs: [
+          { itemName: "Iron Ingot", perMachineRate: 20 },
+          { itemName: "Coke Powder", perMachineRate: 20 },
+        ],
+        outputs: [{ itemName: "Steel Ingot", perMachineRate: 20 }],
+        heating: { kind: "steam", fuelItem: "Steam", fuelRate: 60 },
+      }),
+    ];
+    const shape = () => {
+      const mod = generateModule(steps, options);
+      return { cells: mod.placements.map((p) => `${p.id}@${p.x},${p.y},${p.z}r${p.rot}`).sort(), work: mod.work };
+    };
+    const first = shape();
+    expect(first.work).toBeGreaterThan(0);
+    expect(shape()).toEqual(first);
+  });
+});
+
 describe("moduleTooBig", () => {
   test("refuses plans with thousands of machines instead of grinding for minutes", () => {
     expect(moduleTooBig([step({ deviceId: "grinder", machines: 5000 })])?.machines).toBe(5000);

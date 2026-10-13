@@ -18,3 +18,4 @@ next-env.d.ts
 
 /.claude/worktrees/
 /.scratch/
+/bench/results/

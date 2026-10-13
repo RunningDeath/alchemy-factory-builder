@@ -39,7 +39,7 @@ import { flowRows, nearFeeders, packBlocks, transformBlock, type PackedItem } fr
 
 /** near: next to the feeding blocks; flow: rows by production stage; packed: tightest fit */
 type LayoutMode = "near" | "flow" | "packed";
-import { routeModule, type IoPoint, type RouteResult } from "./router";
+import { routeModule, routingWork, type IoPoint, type RouteResult } from "./router";
 import type { BuildingFootprint, Side } from "./types";
 
 export interface StepFlow {
@@ -189,6 +189,8 @@ export interface GeneratedModule {
     surplus: { itemName: string; rate: number }[];
     /** Buildings in the layout the player hasn't unlocked (it had no way around them) */
     locked: string[];
+    /** Routing effort it took (search steps, see routingWork) */
+    work?: number;
 }
 
 /** Widest corridor tried for stacked towers before falling back to blocks side by side */
@@ -199,8 +201,12 @@ const STACK_RETRIES = 4;
 const PIPE_UP_COST = 4;
 /** Same machines follow one moved down when the towers then need at most this much more floor */
 const PEER_FLOOR_SLACK = 1.1;
-/** After this long, stop trying more layouts once one routes everything */
-const TIME_BUDGET_MS = 60000;
+/**
+ * Routing effort (search steps, see routingWork) after which no more layouts are tried once
+ * one routes everything; about a minute on a desktop. Counted, not timed: the same plan gives
+ * the same module on every machine
+ */
+const WORK_BUDGET = 18_000_000;
 /** Past this many budgets the best layout so far is taken, belts routed or not */
 const HARD_LIMIT_FACTOR = 1;
 /** Share of the time stacked towers may take while belts still fail: the rest is kept for side by side */
@@ -1185,16 +1191,20 @@ export function generateModule(allSteps: ModuleStep[], given: ModuleOptions): Ge
     // The top cell of a storey is taken by the ceiling in game: buildings and pipes stay below it
     const options = { ...given, maxHeight: given.maxHeight - CEILING_CELLS };
     const groups = moduleGroupsOf(allSteps, options.moduleGroups);
-    if (!groups) return generateBlocks(allSteps, options, TIME_BUDGET_MS, true);
-    if (groups.length === 1) return generateBlocks(groups[0].steps, { ...options, stackBlocks: groups[0].tower || options.stackBlocks }, TIME_BUDGET_MS, true);
-    return generateGrouped(allSteps, groups, options);
+    const startWork = routingWork();
+    const module = !groups
+        ? generateBlocks(allSteps, options, WORK_BUDGET, true)
+        : groups.length === 1
+          ? generateBlocks(groups[0].steps, { ...options, stackBlocks: groups[0].tower || options.stackBlocks }, WORK_BUDGET, true)
+          : generateGrouped(allSteps, groups, options);
+    return { ...module, work: routingWork() - startWork };
 }
 
 /**
- * `budgetMs`: stop trying more layouts after this long once one routes everything.
+ * `budget`: routing effort after which no more layouts are tried once one routes everything.
  * `finish`: tidy up the supports (off while it is one module of several: that comes last)
  */
-function generateBlocks(allSteps: ModuleStep[], options: ModuleOptions, budgetMs: number, finish: boolean): GeneratedModule {
+function generateBlocks(allSteps: ModuleStep[], options: ModuleOptions, budget: number, finish: boolean): GeneratedModule {
     let best: GeneratedModule | null = null;
     // One module of several: they line up front to back, so its depth counts most
     const score = (m: GeneratedModule) => m.routes.filter((r) => !r.ok).length * 100000 + (finish ? m.size[0] * m.size[1] : m.size[1] * 100 + m.size[0]);
@@ -1210,7 +1220,7 @@ function generateBlocks(allSteps: ModuleStep[], options: ModuleOptions, budgetMs
     variants.forEach((levelLaneFloor, k) => {
         const n = variants.length;
         const onProgress = options.onProgress && ((f: number, label: string) => options.onProgress!((k + f) / n, label));
-        const result = generateBlocksWith(allSteps, { ...options, levelLaneFloor, onProgress }, budgetMs / n, finish);
+        const result = generateBlocksWith(allSteps, { ...options, levelLaneFloor, onProgress }, budget / n, finish);
         if (!best || score(result) < score(best)) best = result;
     });
     options.onProgress?.(1, "Done");
@@ -1293,7 +1303,7 @@ function buildBlocks(allSteps: ModuleStep[], options: ModuleOptions) {
     return { blocks, steps, can };
 }
 
-function generateBlocksWith(allSteps: ModuleStep[], options: ModuleOptions, budgetMs: number, finish: boolean): GeneratedModule {
+function generateBlocksWith(allSteps: ModuleStep[], options: ModuleOptions, budget: number, finish: boolean): GeneratedModule {
     const { blocks, steps, can } = buildBlocks(allSteps, options);
 
     // Production stage of each step: how many steps lie between it and the module's inputs
@@ -1386,12 +1396,13 @@ function generateBlocksWith(allSteps: ModuleStep[], options: ModuleOptions, budg
         return out;
     };
     // Past this, take the best layout so far even with belts missing
-    const hardLimitMs = budgetMs * HARD_LIMIT_FACTOR;
+    const hardLimit = budget * HARD_LIMIT_FACTOR;
     // Towers stop here while belts fail, so side by side (often routing everything) still gets its turn
-    const stackLimitMs = hardLimitMs * STACK_SHARE;
+    const stackLimit = hardLimit * STACK_SHARE;
     const towerAttempts = attempts.filter(([c]) => c <= TOWER_MAX_CORRIDOR);
     const total = (towers.length < singles.length ? towerAttempts.length * (STACK_RETRIES + 1) : 0) + attempts.length;
-    const started = Date.now();
+    const startWork = routingWork();
+    const spent = () => routingWork() - startWork;
     let attempt = 0;
     let retries = 0;
     /** Side-by-side layouts tried so far: the first corridor's run even past the time limit while belts fail */
@@ -1405,12 +1416,12 @@ function generateBlocksWith(allSteps: ModuleStep[], options: ModuleOptions, budg
         let bestOfSet: GeneratedModule | null = null;
         for (const [corridor, mode] of stacked ? towerAttempts : attempts) {
             // Long enough: settle for the best layout that routes everything
-            if (best?.routes.every((r) => r.ok) && Date.now() - started > budgetMs) break;
+            if (best?.routes.every((r) => r.ok) && spent() > budget) break;
             // Even when no layout routes everything yet: settle for the best one after a while
             const owed = !stacked && sideBySide < FALLBACK_ATTEMPTS && !best?.routes.every((r) => r.ok);
-            if (best && Date.now() - started > hardLimitMs && !owed) break;
+            if (best && spent() > hardLimit && !owed) break;
             if (!stacked) sideBySide++;
-            if (stacked && best && Date.now() - started > stackLimitMs) break;
+            if (stacked && best && spent() > stackLimit) break;
             const label = `Layout ${attempt + 1} of up to ${total}${stacked ? " (stacked)" : ""}: routing belts`;
             const base = attempt++;
             const onProgress = options.onProgress && ((f: number) => options.onProgress!(Math.min(0.99, (base + f) / total), label));
@@ -1427,8 +1438,8 @@ function generateBlocksWith(allSteps: ModuleStep[], options: ModuleOptions, budg
             // All layouts of a corridor width get a chance before settling
             if (mode === "packed" && best.routes.every((r) => r.ok)) break;
         }
-        if (best?.routes.every((r) => r.ok) || !stacked || Date.now() - started > hardLimitMs) break;
-        if (Date.now() - started > stackLimitMs) {
+        if (best?.routes.every((r) => r.ok) || !stacked || spent() > hardLimit) break;
+        if (spent() > stackLimit) {
             towers = singles;
             continue;
         }
@@ -1776,7 +1787,8 @@ function generateGrouped(allSteps: ModuleStep[], chosenGroups: StepGroup[], opti
     const stages = groups.length + MODULE_ARRANGEMENTS.length;
     const report = (done: number, label: string) => (f: number, l: string) => options.onProgress?.((done + f) / stages, l ? `${label}: ${l}` : label);
     const products = groups.map((g, k) => (portals.length && k === 0 ? "purchasing" : g.tower ? g.steps[g.steps.length - 1].itemName : "other steps"));
-    const started = Date.now();
+    const startWork = routingWork();
+    const spent = () => routingWork() - startWork;
     const generateSub = (group: StepGroup, k: number, portalOrder?: string[]) => {
         // What other modules use leaves at the back, once this module's own machines took theirs
         const usedElsewhere = new Set(allSteps.filter((st) => !group.steps.includes(st)).flatMap((st) => [...st.inputs.map((i) => i.itemName), st.heating?.fuelItem ?? ""]));
@@ -1799,7 +1811,7 @@ function generateGrouped(allSteps: ModuleStep[], chosenGroups: StepGroup[], opti
             onProgress: options.onProgress && report(k, `Module of ${products[k]}`),
             portalOrder,
         };
-        return generateBlocks(group.steps, opts, TIME_BUDGET_MS / stages, false);
+        return generateBlocks(group.steps, opts, WORK_BUDGET / stages, false);
     };
     // The other modules first: the portals then line up in the order their items come in
     // there (left to right), so the belts between them don't cross
@@ -1833,7 +1845,7 @@ function generateGrouped(allSteps: ModuleStep[], chosenGroups: StepGroup[], opti
     let best: GeneratedModule | null = null;
     for (const [a, arrangement] of MODULE_ARRANGEMENTS.entries()) {
         // Long enough: settle for the best so far (belting many modules together is slow when it fails)
-        if (best && Date.now() - started > TIME_BUDGET_MS) break;
+        if (best && spent() > WORK_BUDGET) break;
         const onProgress = options.onProgress && report(groups.length + a, `Belting ${subs.length} modules together (layout ${a + 1} of up to ${MODULE_ARRANGEMENTS.length})`);
         // Belts from outside (raw materials, coins) into each module
         const outside = ordered.map((sub, j) => sub.io.filter((p) => p.kind === "import" && !orderedFeeds.some((row, i) => i !== j && row[j] > 0 && madeIn[order[i]].has(p.itemName))).length);
