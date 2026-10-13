@@ -88,8 +88,10 @@ function loadOf(info: NodeBeltInfo): number {
     return capacity > 0 ? Math.min(1, taken / capacity) : 1;
 }
 
-/** `fuel`: the plan's selected fuel, for heated steps that also use it as an ingredient */
+/** `fuel`: the plan's selected fuel (id or name), for heated steps that also use it as an ingredient */
 export function stepsFromReport(report: BeltReport, fuel?: string): ModuleStep[] {
+    // The config keeps the item id ("coal"), the report item names ("Coal")
+    const fuelName = fuel ? (getItem(fuel)?.name ?? fuel) : undefined;
     return productionOrder(report)
         .map((key) => report.nodes[key])
         .filter((info) => info.deviceId && getFootprint(info.deviceId) && machinesFor(info) > 0)
@@ -102,6 +104,6 @@ export function stepsFromReport(report: BeltReport, fuel?: string): ModuleStep[]
             outputs: flows(info.perMachineOutputs, false, loadOf(info)),
             fluidInputs: info.perMachineInputs.filter((f) => f.isFluid).map((f) => f.itemName),
             fluids: { inputs: flows(info.perMachineInputs, true, loadOf(info)), outputs: flows(info.perMachineOutputs, true, loadOf(info)) },
-            heating: heatingFor(report, info, fuel),
+            heating: heatingFor(report, info, fuelName),
         }));
 }

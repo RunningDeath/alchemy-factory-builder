@@ -84,7 +84,7 @@ function stepsFor(c: Case) {
     const trees = calculatePlan(cfg);
     if (!trees.length) return null;
     const report = analyzeBelts(trees, cfg, { planParallelLines: true, machineRounding: "up" });
-    return { report, steps: stepsFromReport(report) };
+    return { report, steps: stepsFromReport(report, cfg.selectedFuel) };
 }
 
 /**
