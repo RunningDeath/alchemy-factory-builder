@@ -110,6 +110,8 @@ const LIFT = {
 
 const BELT_LAYERS = 3; // bottom + middle
 const MAX_EXPANSIONS = 1_000_000;
+/** Cells a connection's search avoids, one by one, when its path takes a cell twice */
+const CROSSING_RETRIES = 3;
 
 /**
  * Search steps done so far, over all routing: the generator's measure of effort. Unlike a
@@ -580,13 +582,14 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
         return null;
     }
 
-    function commit(endNode: SearchNode, goal: Goal, conn: Connection, sourceId: string, sinkId: string, tree?: string) {
+    /**
+     * The first cell a path takes twice (a lift shaft through its own belt), or null. The
+     * search knows cells and headings, not the path behind them, so it can find such a path
+     */
+    function crossing(endNode: SearchNode): string | null {
+        const used = new Set<string>();
         const steps: SearchNode[] = [];
         for (let n: SearchNode | null = endNode; n; n = n.parent) steps.unshift(n);
-        const start = (steps[0] as SearchNode & { start?: Start }).start!;
-
-        // Reject paths that cross themselves
-        const used = new Set<string>();
         for (const s of steps) {
             const st = s.step;
             const keys =
@@ -596,10 +599,19 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
                       ? bridgeCells(st.anchor, st.heading).map(keyOf)
                       : Array.from({ length: Math.abs(st.exitZ - st.entry[2]) + 1 }, (_, i) => keyOf([st.entry[0], st.entry[1], Math.min(st.exitZ, st.entry[2]) + i]));
             for (const k of keys) {
-                if (used.has(k)) return false;
+                if (used.has(k)) return k;
                 used.add(k);
             }
         }
+        return null;
+    }
+
+    function commit(endNode: SearchNode, goal: Goal, conn: Connection, sourceId: string, sinkId: string, tree?: string) {
+        const steps: SearchNode[] = [];
+        for (let n: SearchNode | null = endNode; n; n = n.parent) steps.unshift(n);
+        const start = (steps[0] as SearchNode & { start?: Start }).start!;
+        // Paths that cross themselves can't be built
+        if (crossing(endNode)) return false;
 
         const created: RouteNode[] = [];
         for (const s of steps) {
@@ -890,6 +902,14 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
             allowNewExit = true;
             found = search(starts, goal, estimate, levels);
         }
+        // A path through itself: search again without the cell it takes twice
+        const avoided: string[] = [];
+        for (let k = found ? crossing(found.end) : null; found && k && avoided.length < CROSSING_RETRIES; k = found ? crossing(found.end) : null) {
+            avoided.push(k);
+            reserved.add(k);
+            found = search(starts, goal, estimate, levels);
+        }
+        avoided.forEach((k) => reserved.delete(k));
         allowNewExit = false;
         let ok = false;
         if (found) {
