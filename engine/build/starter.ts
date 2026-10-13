@@ -1,8 +1,9 @@
 /**
- * Starter box for self-made fertilizer: the nurseries need fertilizer before the module
- * makes any, so a small storage box sits in their fertilizer belt. The player fills it once;
- * after that the fertilizer just passes through it. It goes where the player reaches it:
- * at the module's outline, nothing above it, on the belt back to the nurseries.
+ * Starter box for what a module makes and needs to make it: nurseries need fertilizer before
+ * the module makes any, stoves need fuel before a heated chain makes its own. A small storage
+ * box sits in their feed; the player fills it once, after that the item just passes through
+ * it. It goes where the player reaches it: at the module's outline, nothing above it, on the
+ * belt back to the consumers.
  */
 import { beltPieceFor } from "./belt-pieces";
 import { getFootprint, oppositeSide, rotateSide, type Rotation } from "./footprint";
@@ -21,24 +22,33 @@ function boxRotation(inSide: Side): Rotation {
  * A box laid back into the two straight belt pieces it stands in for, in lab stands: the box
  * carried what stood on it, a belt doesn't (stands nothing rests on go when supports are tidied)
  */
-function boxToBelts(box: Placement, fertilizer: string): Placement[] {
+function boxToBelts(box: Placement, item: string): Placement[] {
     const inSide = rotateSide("left", box.rot);
     const piece = beltPieceFor([inSide], [oppositeSide(inSide)])!;
     return placementCells(box).flatMap((c, k): Placement[] => [
-        { uid: `${box.uid}:b${k}`, id: piece.id, x: c.x, y: c.y, z: c.z, rot: piece.rot, lane: "route", label: fertilizer },
+        { uid: `${box.uid}:b${k}`, id: piece.id, x: c.x, y: c.y, z: c.z, rot: piece.rot, lane: "route", label: item },
         { uid: `${box.uid}:s${k}`, id: "frame-single", x: c.x, y: c.y, z: c.z, rot: 0 },
     ]);
 }
 
+export const starterLabel = (item: string) => `Starter box: ${item}`;
+
 /**
- * Puts the starter box into the belts that feed the nurseries taking `fertilizer` (moving a
- * box the blocks already have when a better reachable spot feeds them all): one box on two
- * straight belt pieces where all their feeds share a stretch, more only where they don't.
+ * Puts the starter box into the belts that feed the consumers taking `item` (nurseries by
+ * default; moving a box the blocks already have when a better reachable spot feeds them all):
+ * one box on two straight belt pieces where all their feeds share a stretch, more only where
+ * they don't.
  */
-export function placeStarterBox(input: Placement[], fertilizer: string, maxHeight: number, makeUid: () => string): Placement[] {
+export function placeStarterBox(
+    input: Placement[],
+    item: string,
+    maxHeight: number,
+    makeUid: () => string,
+    isConsumer: (p: Placement) => boolean = (p) => p.id.includes("nursery"),
+): Placement[] {
     if (!getFootprint(STARTER_BOX_ID)) return input;
-    const existing = input.find((p) => p.starterBox);
-    const placements = existing ? [...input.filter((p) => p !== existing), ...boxToBelts(existing, fertilizer)] : input;
+    const existing = input.find((p) => p.starterBox && p.label === starterLabel(item));
+    const placements = existing ? [...input.filter((p) => p !== existing), ...boxToBelts(existing, item)] : input;
     const byUid = new Map(placements.map((p) => [p.uid, p]));
     const links = portConnections(placements);
     const feeding = new Map<string, string[]>();
@@ -58,16 +68,16 @@ export function placeStarterBox(input: Placement[], fertilizer: string, maxHeigh
     }
     const lift = (p?: Placement) => !!p?.id.startsWith("conveyer-lift");
     const carries = (p: Placement) => p.id.startsWith("belt") || lift(p) || p.id === "splitter-vert";
-    const nurseries = placements.filter((p) => p.id.includes("nursery"));
-    // Belt pieces upstream of each nursery's fertilizer, and how far up
+    const nurseries = placements.filter(isConsumer);
+    // Belt pieces upstream of each consumer's feed of the item, and how far up
     const upstream = nurseries.map((n) => {
         const dist = new Map<string, number>();
-        const queue = [...(feeding.get(n.uid) ?? [])].filter((u) => byUid.get(u)?.label === fertilizer || lift(byUid.get(u)));
+        const queue = [...(feeding.get(n.uid) ?? [])].filter((u) => byUid.get(u)?.label === item || lift(byUid.get(u)));
         queue.forEach((u) => dist.set(u, 1));
         for (let i = 0; i < queue.length; i++) {
             for (const u of feeding.get(queue[i]) ?? []) {
                 const p = byUid.get(u);
-                if (!p || dist.has(u) || !carries(p) || (p.label !== fertilizer && !lift(p))) continue;
+                if (!p || dist.has(u) || !carries(p) || (p.label !== item && !lift(p))) continue;
                 dist.set(u, dist.get(queue[i])! + 1);
                 queue.push(u);
             }
@@ -87,7 +97,7 @@ export function placeStarterBox(input: Placement[], fertilizer: string, maxHeigh
         if (!sa || !current.includes(a)) return null;
         const before = (feeding.get(uid) ?? []).map((u) => byUid.get(u)!).find((p) => current.includes(p) && p.z === a.z && straight(p)?.outSide === sa.outSide);
         if (!before) return null;
-        const box: Placement = { uid: makeUid(), id: STARTER_BOX_ID, x: Math.min(a.x, before.x), y: Math.min(a.y, before.y), z: a.z, rot: boxRotation(sa.inSide), label: `Starter box: ${fertilizer}`, starterBox: true };
+        const box: Placement = { uid: makeUid(), id: STARTER_BOX_ID, x: Math.min(a.x, before.x), y: Math.min(a.y, before.y), z: a.z, rot: boxRotation(sa.inSide), label: starterLabel(item), starterBox: true };
         // Its input on the upstream cell, its output on the downstream one
         const ports = placementPorts(box);
         const inPort = ports.find((q) => q.dir === "in");

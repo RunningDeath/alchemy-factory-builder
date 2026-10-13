@@ -282,6 +282,35 @@ describe("separate inputs, filters and heating", () => {
   });
 });
 
+describe("starter boxes", () => {
+  test("self-made fuel whose making needs heat (coke powder from a heated crucible) gets a box in the stoves' feed", () => {
+    const cfg: PlannerConfig = {
+      targets: [{ item: "Copper Ingot", rate: 6 }],
+      availableResources: [],
+      fuelEfficiency: 0,
+      alchemySkill: 0,
+      factoryEfficiency: 0,
+      logisticsEfficiency: 0,
+      throwingEfficiency: 0,
+      fertilizerEfficiency: 0,
+      salesAbility: 0,
+      negotiationSkill: 0,
+      customerMgmt: 0,
+      relicKnowledge: 0,
+      selectedFuel: "cokepowder",
+      selfFuel: true,
+      selectedFertilizer: "",
+      selfFertilizer: true,
+    };
+    const report = analyzeBelts(calculatePlan(cfg), cfg, { planParallelLines: true, machineRounding: "up" });
+    const steps = stepsFromReport(report, cfg.selectedFuel);
+    expect(steps.some((s) => s.itemName === "Coke Powder")).toBe(true);
+    const mod = generateModule(steps, { ...options, beltSpeed: report.beltSpeed, unlocks: { level: 5 } });
+    expect(mod.placements.filter((p) => p.starterBox).map((p) => p.label)).toContain("Starter box: Coke Powder");
+    expect(validateLayout(mod.placements)).toEqual([]);
+  }, 120_000);
+});
+
 describe("unbuildable plans", () => {
   test("a byproduct on the product's belt before filters are unlocked: declined, not laid out broken", () => {
     const crusher = step({

@@ -1704,6 +1704,9 @@ function routeAndFinish(
         const fertilizers = new Set(tiers.filter((t) => t.deviceId.includes("nursery")).flatMap((t) => t.lanes.filter((l) => l.kind === "in").flatMap((l) => l.items.map((i) => i.itemName))));
         // (the blocks' own box moves to the outline when a spot there feeds every nursery too)
         for (const item of fertilizers) if (made.has(item) && !(options.boughtItems ?? []).includes(item)) routed.placements = placeStarterBox(routed.placements, item, options.maxHeight, () => nextUid("sb"));
+        // Self-made fuel whose own making needs heat (coke powder from a heated crucible): the
+        // stoves need fuel before any is made, so a box in their feed too
+        for (const item of heatedFuels(tiers)) if (!(options.boughtItems ?? []).includes(item)) routed.placements = placeStarterBox(routed.placements, item, options.maxHeight, () => nextUid("sb"), (p) => p.id === STOVE_ID);
         // Rows and columns that only pass belts straight through go before the supports get cheaper
         const compact = removeStraightLines({ placements: routed.placements, io: routed.io, tiers });
         // Pipe networks through what the belts left free, before supports fill any of it
@@ -1722,6 +1725,24 @@ function routeAndFinish(
 function finishSupports(placements: Placement[], can: Capabilities): Placement[] {
     const blocked = preferBlocks(pruneSupports(placements));
     return pruneSupports(can.beams ? beamsUnderRuns(blocked, () => nextUid("bm")) : blocked);
+}
+
+/** Fuels the module makes for its own stoves although making them takes heat: they never start on their own */
+function heatedFuels(tiers: TierInfo[]): string[] {
+    const outs = (t: TierInfo) => t.lanes.filter((l) => l.kind === "out").flatMap((l) => l.items.map((i) => i.itemName));
+    const ins = (t: TierInfo) => t.lanes.filter((l) => l.kind === "in").flatMap((l) => l.items.map((i) => i.itemName));
+    const fuels = new Set(tiers.filter((t) => t.heating?.kind === "stove").map((t) => t.heating!.fuelItem));
+    return [...fuels].filter((fuel) => {
+        // Every block on the way to the fuel, back to the module's inputs
+        const seen = new Set<TierInfo>();
+        const queue = [fuel];
+        for (let i = 0; i < queue.length; i++)
+            for (const t of tiers.filter((t) => !seen.has(t) && outs(t).includes(queue[i]))) {
+                seen.add(t);
+                queue.push(...ins(t));
+            }
+        return seen.size > 0 && [...seen].some((t) => t.heating);
+    });
 }
 
 function moduleSize(placements: Placement[]): [number, number, number] {

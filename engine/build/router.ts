@@ -198,7 +198,8 @@ export function assignFlows(
         // consumer, so their back flows reach all of them: one starter box upstream starts every
         // nursery. Producers each feeding other nurseries deadlock: the box reaches only some
         // plants, and the potion needs all of them before any producer runs
-        const shared = producers.length > 1 && consumers.length > 0 && totalSupply > totalDemand + 1e-6 && (exportable?.(itemName) ?? true);
+        // (whether the rest leaves the module or stays on a consumer's belt: the module comes first)
+        const shared = producers.length > 1 && consumers.length > 0 && totalSupply > totalDemand + 1e-6;
         if (shared) {
             let needed = 0;
             let covered = 0;

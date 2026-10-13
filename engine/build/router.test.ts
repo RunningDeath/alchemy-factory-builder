@@ -72,6 +72,15 @@ describe("assignFlows", () => {
     expect(exported("b2")).toBeCloseTo(20, 6);
   });
 
+  test("self-made fertilizer that doesn't leave the module: the module is fed first all the same", () => {
+    // Nothing may be exported (the rest stays on a consumer's belt). Matched greedily, b1 would
+    // feed n1 and n2 only and b2 the rest: one starter box reaches only some nurseries
+    const flows = assignFlows([end("b1", "out", 10, 0), end("b2", "out", 20, 5), end("n1", "in", 9, 0), end("n2", "in", 6, 3), end("n3", "in", 2, 6)], () => false, []);
+    const fed = (uid: string) => [...new Set(flows.filter((f) => f.from !== "import" && f.to !== "export" && f.from.uid === uid && !f.surplus).map((f) => (f.to as LaneEnd).uid))].sort();
+    expect(fed("b1")).toEqual(["n1", "n2", "n3"]);
+    expect(fed("b2")).toEqual(["n1", "n2", "n3"]);
+  });
+
   test("rounded-up consumers share what is made instead of importing the difference", () => {
     const flows = assignFlows([end("p", "out", 100, 0), end("c1", "in", 60, 0), end("c2", "in", 60, 5)]);
     expect(flows.some((f) => f.from === "import")).toBe(false);
