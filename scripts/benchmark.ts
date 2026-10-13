@@ -61,6 +61,8 @@ interface Result extends Case {
     machines: number;
     steps: number;
     failed: number;
+    /** Failed belts by reason (see RouteResult.reason) */
+    failReasons?: Record<string, number>;
     issues: number;
     /** Layout issues by kind (collision, unsupported, unheated, ...) */
     issueKinds?: Record<string, number>;
@@ -263,6 +265,7 @@ function runCase(c: Case): Result {
         machines: machinesOf(planned.steps),
         steps: planned.steps.length,
         failed: mod.routes.filter((r) => !r.ok).length,
+        failReasons: mod.routes.filter((r) => !r.ok).reduce<Record<string, number>>((m, r) => ((m[r.reason ?? "?"] = (m[r.reason ?? "?"] ?? 0) + 1), m), {}),
         issues: issues.length,
         issueKinds: issues.reduce<Record<string, number>>((m, i) => ((m[i.kind] = (m[i.kind] ?? 0) + 1), m), {}),
         size: mod.size,

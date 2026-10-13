@@ -4,7 +4,7 @@
  * wood block and lab stand columns down to whatever is below (machine tops that take a
  * load, or the ground); lab stands let lane belts underneath keep running.
  */
-import { cellKey, cellsCollide, placementCells, type Placement } from "./layout";
+import { buildOccupancy, cellKey, cellsCollide, placementCells, type Placement } from "./layout";
 import { transformBlock } from "./packing";
 import { findLaneEnds } from "./router";
 import { addToOccupancy, isSupported, supportColumn, type Occupancy } from "./supports";
@@ -79,16 +79,22 @@ function blockedEnds(placements: Placement[]): number {
             occupied.add(`${c.x},${c.y},${c.z}`);
             if (p.id !== "frame-single") above.set(`${c.x},${c.y}`, Math.max(above.get(`${c.x},${c.y}`) ?? -1, c.z));
         }
-    const shaftFree = (x: number, y: number, z: number) => {
-        for (let k = 0; k <= z; k++) if (occupied.has(`${x},${y},${k}`)) return false;
+    const occupancy = buildOccupancy(placements);
+    // The belt at a lane end stands on a support column: free cells down to the ground or to
+    // something that carries it (the router builds nothing else there; a free shaft beside it
+    // doesn't hold the belt)
+    const supportable = (x: number, y: number, z: number) => {
+        for (let k = z - 1; k >= 0; k--) {
+            const cells = occupancy.get(cellKey(x, y, k)) ?? [];
+            if (cells.length) return isSupported(occupancy, x, y, k + 1);
+        }
         return true;
     };
     return findLaneEnds(placements).filter(({ port: [x, y, z] }) => {
         if (occupied.has(`${x},${y},${z}`)) return true;
         // Nothing but lab stands over the cell in front of a lane end: the belt comes in there
         if ((above.get(`${x},${y}`) ?? -1) > z) return true;
-        if (z === 0) return false;
-        return ![[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].some(([ox, oy]) => shaftFree(x + ox, y + oy, z - 1));
+        return !supportable(x, y, z);
     }).length;
 }
 

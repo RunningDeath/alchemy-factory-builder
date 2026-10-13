@@ -38,6 +38,8 @@ export interface RouteResult {
     to: string;
     rate: number;
     ok: boolean;
+    /** Why a connection failed: no usable start cell, no way through free cells, the search ran out of steps, or the path found couldn't be built */
+    reason?: "no-start" | "no-way" | "search-limit" | "commit";
     /** Identifies the connection across routing passes */
     key?: string;
 }
@@ -107,7 +109,7 @@ const LIFT = {
 };
 
 const BELT_LAYERS = 3; // bottom + middle
-const MAX_EXPANSIONS = 200_000;
+const MAX_EXPANSIONS = 1_000_000;
 
 /**
  * Search steps done so far, over all routing: the generator's measure of effort. Unlike a
@@ -459,9 +461,11 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
     };
 
     /** `levels`: heights a lift may go to (the ground, the starts and the goals of this connection) */
+    let lastFailure: RouteResult["reason"];
     function search(starts: Start[], goal: (cell: Cell, heading: Side) => Goal | null, estimate: (c: Cell) => number, levels: number[]): { end: SearchNode; goal: Goal } | null {
         const open = new Heap();
         const best = new Map<string, number>();
+        lastFailure = "no-start";
         const h = (c: Cell) => estimate(c) * 1.5;
         const supportMemo = new Map<string, number | null>();
         const supports = (c: Cell) => {
@@ -496,6 +500,7 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
                 const g = goal(s.cell, heading);
                 if (g) return { end: node, goal: g };
                 open.push(node);
+                lastFailure = "no-way";
             }
         }
 
@@ -571,6 +576,7 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
                 }
             }
         }
+        if (expansions > MAX_EXPANSIONS) lastFailure = "search-limit";
         return null;
     }
 
@@ -918,7 +924,7 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
             if (!connected) reserveEnd(e);
         }
         // Surplus that finds no way to a consumer just stays where it is (it was optional)
-        if (ok || !conn.surplus) routes.push({ itemName: conn.itemName, from: endName(conn.from), to: endName(conn.to), rate: conn.rate, ok, key: connKey(conn) });
+        if (ok || !conn.surplus) routes.push({ itemName: conn.itemName, from: endName(conn.from), to: endName(conn.to), rate: conn.rate, ok, key: connKey(conn), ...(!ok && { reason: found ? "commit" : lastFailure }) });
     }
 
     // Merge surplus per item
