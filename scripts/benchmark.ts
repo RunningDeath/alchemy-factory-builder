@@ -11,8 +11,9 @@
  *       that makes it and the last, with that level's buildings and its best fuel and
  *       fertilizer (highest heat and nutrient value the factory can make by then; raw
  *       materials are never fuel), with the cauldron off and (once unlocked) on. Products whose plan has the same structure as one already
- *       taken (same machines, connections and rates, other items) are skipped. Writes
- *       bench/corpus.json; commit it, it is the reference.
+ *       taken (same machines, connections and rates, other items) are skipped. A second,
+ *       fixed group of dense cases (seed 2, 120–220 machines) stands in for high research.
+ *       Writes bench/corpus.json; commit it, it is the reference.
  *   bun run scripts/benchmark.ts run [--out bench/results/<name>.json] [--jobs 8] [--only <item>]
  *       Generates a module for every corpus case (no research, fuel and fertilizer made in
  *       the factory) and records failed belts, layout issues, size, lifts, belts, routing
@@ -39,6 +40,11 @@ import type { PlannerConfig } from "../engine/types";
 const CORPUS = "bench/corpus.json";
 /** Machines a case asks for: from small lines to modules that take a while */
 const MACHINES = { min: 8, max: 80 };
+/**
+ * Dense cases: many machines per product, as with high research (belts and machines get
+ * faster by the same factor, so a high rate without research packs the same lines)
+ */
+const DENSE = { seed: 2, count: 15, machines: { min: 120, max: 220 } };
 
 interface Case {
     item: string;
@@ -191,7 +197,7 @@ function suppliesAt(): (level: number, cauldron: boolean) => Supplies {
     };
 }
 
-function makeCorpus(seed: number, count: number): Case[] {
+function makeCorpus(seed: number, count: number, machines = MACHINES): Case[] {
     const rand = random(seed);
     const supplies = suppliesAt();
     for (let level = 1; level <= MAX_LEVEL; level++)
@@ -208,7 +214,7 @@ function makeCorpus(seed: number, count: number): Case[] {
     let products = 0;
     for (const item of items) {
         if (products >= count) break;
-        const want = MACHINES.min + Math.floor(rand() * (MACHINES.max - MACHINES.min + 1));
+        const want = machines.min + Math.floor(rand() * (machines.max - machines.min + 1));
         // Where between the first level that makes it and the last the product is built
         const progress = rand();
         // One rate per product (from the first variant), so its variants compare
@@ -367,6 +373,7 @@ if (command === "case") {
     console.log(JSON.stringify(runCase(JSON.parse(args[1]))));
 } else if (command === "corpus") {
     const cases = makeCorpus(Number(flag("seed", "1")), Number(flag("count", "60")));
+    cases.push(...makeCorpus(DENSE.seed, DENSE.count, DENSE.machines));
     mkdirSync(dirname(CORPUS), { recursive: true });
     writeFileSync(CORPUS, JSON.stringify(cases, null, 2) + "\n");
     console.log(`${cases.length} cases: ${CORPUS}`);

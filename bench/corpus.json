@@ -830,5 +830,213 @@
     "fuel": "panaceaelixir",
     "fertilizer": "panaceaelixir",
     "rate": 0.73
+  },
+  {
+    "item": "Brine",
+    "level": 9,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 80
+  },
+  {
+    "item": "Brine",
+    "level": 10,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 80
+  },
+  {
+    "item": "Philosopher's Stone",
+    "level": 9,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 0.44
+  },
+  {
+    "item": "Moon Tear",
+    "level": 10,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 0.47
+  },
+  {
+    "item": "Moon Tear",
+    "level": 10,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 0.47
+  },
+  {
+    "item": "Fairy Dust",
+    "level": 10,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 6.9
+  },
+  {
+    "item": "Fairy Dust",
+    "level": 10,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 6.9
+  },
+  {
+    "item": "Plant Ash",
+    "level": 5,
+    "cauldron": false,
+    "fuel": "cokepowder",
+    "fertilizer": "advancedfertilizer",
+    "rate": 19
+  },
+  {
+    "item": "Plant Ash",
+    "level": 6,
+    "cauldron": true,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 19
+  },
+  {
+    "item": "Silver Amulet",
+    "level": 8,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 0.82
+  },
+  {
+    "item": "Silver Amulet",
+    "level": 8,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 0.82
+  },
+  {
+    "item": "Refined Sand 5",
+    "level": 7,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 15
+  },
+  {
+    "item": "Impure Copper Powder",
+    "level": 6,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 7.5
+  },
+  {
+    "item": "Impure Copper Powder",
+    "level": 7,
+    "cauldron": true,
+    "fuel": "blastpotion",
+    "fertilizer": "catalyst2",
+    "rate": 7.5
+  },
+  {
+    "item": "Brandy",
+    "level": 10,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 6.2
+  },
+  {
+    "item": "Brandy",
+    "level": 10,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 6.2
+  },
+  {
+    "item": "Moonlit Soap",
+    "level": 9,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 0.1
+  },
+  {
+    "item": "Moonlit Soap",
+    "level": 9,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 0.1
+  },
+  {
+    "item": "Oblivion Essence",
+    "level": 9,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 5.4
+  },
+  {
+    "item": "Growth Potion",
+    "level": 8,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 7.2
+  },
+  {
+    "item": "Growth Potion",
+    "level": 8,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 7.2
+  },
+  {
+    "item": "Diamond",
+    "level": 7,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 7.7
+  },
+  {
+    "item": "Whispering Fields",
+    "level": 4,
+    "cauldron": false,
+    "fuel": "cokepowder",
+    "fertilizer": "advancedfertilizer",
+    "rate": 13
+  },
+  {
+    "item": "Whispering Fields",
+    "level": 6,
+    "cauldron": true,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 13
+  },
+  {
+    "item": "Crude Shard",
+    "level": 8,
+    "cauldron": false,
+    "fuel": "blackpowder",
+    "fertilizer": "growthpotion",
+    "rate": 190
+  },
+  {
+    "item": "Crude Shard",
+    "level": 9,
+    "cauldron": true,
+    "fuel": "panaceaelixir",
+    "fertilizer": "panaceaelixir",
+    "rate": 190
   }
 ]
