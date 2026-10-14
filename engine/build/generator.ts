@@ -39,7 +39,7 @@ import { flowRows, nearFeeders, packBlocks, transformBlock, type PackedItem } fr
 
 /** near: next to the feeding blocks; flow: rows by production stage; packed: tightest fit */
 type LayoutMode = "near" | "flow" | "packed";
-import { routeModule, routingWork, type IoPoint, type RouteResult } from "./router";
+import { routeModule, routingWork, withWorkLimit, type IoPoint, type RouteResult } from "./router";
 import type { BuildingFootprint, Side } from "./types";
 
 export interface StepFlow {
@@ -209,6 +209,13 @@ const PEER_FLOOR_SLACK = 1.1;
 const WORK_BUDGET = 18_000_000;
 /** Past this many budgets the best layout so far is taken, belts routed or not */
 const HARD_LIMIT_FACTOR = 1;
+/**
+ * Routing effort for the whole module, all layouts together: the budget above is only
+ * checked between layouts, and one layout of a dense plan can take many times it. Past
+ * this every search gives up and the best layout so far is taken (about two to three
+ * minutes on a desktop)
+ */
+const MAX_WORK = 3 * WORK_BUDGET;
 
 /** Free cells around each block, so belts can run between blocks; wider when routing fails */
 const CORRIDORS = [1, 2, 3];
@@ -1208,11 +1215,11 @@ export function generateModule(allSteps: ModuleStep[], given: ModuleOptions): Ge
     const options = { ...given, maxHeight: given.maxHeight - CEILING_CELLS };
     const groups = moduleGroupsOf(allSteps, options.moduleGroups);
     const startWork = routingWork();
-    const module = !groups
+    const module = withWorkLimit(MAX_WORK, () => !groups
         ? generateBlocks(allSteps, options, WORK_BUDGET, true)
         : groups.length === 1
           ? generateBlocks(groups[0].steps, { ...options, stackBlocks: groups[0].tower || options.stackBlocks }, WORK_BUDGET, true)
-          : generateGrouped(allSteps, groups, options);
+          : generateGrouped(allSteps, groups, options));
     return { ...module, work: routingWork() - startWork };
 }
 

@@ -119,6 +119,18 @@ const CROSSING_RETRIES = 3;
  */
 let searchSteps = 0;
 export const routingWork = () => searchSteps;
+/** Search steps after which every search gives up at once (see withWorkLimit) */
+let workLimit = Infinity;
+/** Run `fn` with searches cut off once `limit` more steps are spent; the rest fails as search-limit */
+export function withWorkLimit<T>(limit: number, fn: () => T): T {
+    const outer = workLimit;
+    workLimit = Math.min(outer, searchSteps + limit);
+    try {
+        return fn();
+    } finally {
+        workLimit = outer;
+    }
+}
 /** A lift costs as much as 8 belt cells: fewer lifts, but no long detours around blocks either */
 const LIFT_COST = 8;
 /** Per support cell under a raised belt or lift: tall columns turn into walls, so stay low and lift late */
@@ -508,6 +520,7 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
 
         let expansions = 0;
         while (open.size > 0 && expansions++ < MAX_EXPANSIONS) {
+            if (searchSteps >= workLimit) break;
             searchSteps++;
             const cur = open.pop();
             const stateKey = `${keyOf(cur.cell)}:${cur.heading}`;
@@ -578,7 +591,7 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
                 }
             }
         }
-        if (expansions > MAX_EXPANSIONS) lastFailure = "search-limit";
+        if (expansions > MAX_EXPANSIONS || searchSteps >= workLimit) lastFailure = "search-limit";
         return null;
     }
 
@@ -745,6 +758,9 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
             }
             const cells: Cell[] = [start, add(start, dir)].flatMap((c) => [c, [c[0], c[1], c[2] + 1] as Cell]);
             if (![...leadCells, ...cells].every(free)) continue;
+            // Its two outputs need room for their belts (another splitter may already stand there)
+            const out = add(add(start, dir), dir);
+            if (![out, [out[0], out[1], out[2] + 1] as Cell].every(free)) continue;
             // Its bottom cells and the belt leading to it need supports down to the ground (not
             // onto a machine that can't carry them)
             if (![...leadCells, start, add(start, dir)].every((c) => supportCost(occupancy, c[0], c[1], c[2]) !== null)) continue;
@@ -754,7 +770,6 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
             const placement: Placement = { uid: makeUid("p"), id: PRIORITY_SPLITTER, x: Math.min(...xs), y: Math.min(...ys), z: exit.port[2], rot: rotFor("right", dir), label: itemName, lane: "route" };
             const piece = beltPieceFor([oppositeSide(dir)], [dir])!;
             const belts: Placement[] = leadCells.map((c) => ({ uid: makeUid("b"), id: piece.id, x: c[0], y: c[1], z: c[2], rot: piece.rot, label: itemName, lane: "route" }));
-            const out = add(add(start, dir), dir);
             const end = (z: number, suffix: string): LaneEnd => ({ uid: `${placement.uid}:${suffix}`, kind: "out", items: exit.items, port: [out[0], out[1], z], dir, block: exit.block });
             return { placement, belts, cells: [...leadCells, ...cells], base: [...leadCells, start, add(start, dir)], first: end(exit.port[2], "first"), overflow: end(exit.port[2] + 1, "overflow") };
         }
