@@ -23,7 +23,7 @@
 import { beltPieceFor } from "./belt-pieces";
 import { footprintPorts, getFootprint, isDirectlyStackable, oppositeSide, rotatedSize, SIDE_OFFSET, STACKS_ON_ITSELF, type Rotation } from "./footprint";
 import { buildOccupancy, cellKey, placementCells, placementPorts, type Placement } from "./layout";
-import { preferBlocks, pruneSupports, supportColumn, beamsUnderRuns } from "./supports";
+import { addToOccupancy, preferBlocks, pruneSupports, supportColumn, beamsUnderRuns } from "./supports";
 import { buildTowers, type Tower } from "./towers";
 import { attachDisposal, type Disposal } from "./disposal";
 import { PURCHASING_PORTAL, purchaseSteps } from "./purchasing";
@@ -170,7 +170,7 @@ export interface TierInfo {
     stacking: "none" | "direct" | "beam-deck";
     lanes: LaneInfo[];
     fluidInputs: string[];
-    /** Machine ports above the lane level that need a manual connection */
+    /** Machine outputs off the lanes that got no belt stub and need a manual connection */
     offLanePorts: number;
     /** Inputs share one lane (couldn't be separated): a filter is needed in game */
     mixedInputs?: boolean;
@@ -544,6 +544,7 @@ function buildTier(
     const bottom = origin.y + shape.depth - 1 - filterRows(step);
     const laneItems = (flows: StepFlow[], machineCount: number) => flows.map((fl) => ({ itemName: fl.itemName, rate: fl.perMachineRate * machineCount }));
     const inputLanes: InputLane[] = [];
+    const offLaneOuts: ReturnType<typeof placementPorts> = [];
 
     for (let level = 0; level < levelsUsed; level++) {
         const z = levelZ(level);
@@ -558,7 +559,9 @@ function buildTier(
                 .sort((a, b) => a.y - b.y || a.x - b.x);
             for (const port of ports) {
                 if (port.z !== z || port.face === "up" || port.face === "down" || port.face === "top" || port.face === "base") {
-                    offLanePorts++;
+                    // Outputs off the lanes (raised, or out the front or back) get a belt stub of
+                    // their own below; inputs there just stay unused (another port takes the items)
+                    if (port.dir === "out") offLaneOuts.push(port);
                     continue;
                 }
                 const laneSide = oppositeSide(port.face);
@@ -691,6 +694,34 @@ function buildTier(
     belts.push(...fed.belts);
     lifts.push(...fed.lifts);
     lanes.push(...fed.lanes);
+
+    // A straight belt in front of each output off the lanes, its end open for the router;
+    // inside the block's outline only (outside it neighbours would collide)
+    const taken = buildOccupancy([...placements, ...lifts, ...belts]);
+    for (const port of offLaneOuts) {
+        const face = port.face as Side;
+        if (!SIDE_OFFSET[face]) {
+            offLanePorts++;
+            continue;
+        }
+        const [tx, ty] = SIDE_OFFSET[face];
+        const cell = { x: port.x + tx, y: port.y + ty, z: port.z };
+        const inside = cell.x >= origin.x && cell.x < origin.x + shape.width && cell.y >= top && cell.y <= origin.y + shape.depth - 1;
+        // The cell past the stub too, where the router's belt starts (a shaper's front faces
+        // the input header; that output still needs a hand)
+        const free = (x: number, y: number) => (taken.get(cellKey(x, y, cell.z)) ?? []).length === 0;
+        if (!inside || !free(cell.x, cell.y) || !free(cell.x + tx, cell.y + ty)) {
+            offLanePorts++;
+            continue;
+        }
+        const piece = beltPieceFor([oppositeSide(face)], [face])!;
+        const stub: Placement = {
+            uid: nextUid("b"), id: piece.id, ...cell, rot: piece.rot, nodeKey: step.nodeKey, lane: "out", label: step.outputs.map((o) => o.itemName).join(" + "),
+            laneEnd: { kind: "out", items: laneItems(step.outputs, 1) },
+        };
+        addToOccupancy(taken, stub);
+        belts.push(stub);
+    }
 
     placements.push(...lifts);
     placements.push(...belts);

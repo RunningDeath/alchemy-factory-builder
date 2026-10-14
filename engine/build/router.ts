@@ -92,6 +92,10 @@ export interface RouterOptions {
 }
 
 const PRIORITY_SPLITTER = "splitter-vert";
+/** Routing passes per layout: failed connections first in each next one */
+const ROUTE_PASSES = 6;
+/** Most cells a later pass adds to a connection's distance to vary the order */
+const ORDER_SHUFFLE = 20;
 /** How far from its exit a priority splitter may stand when it doesn't fit right there */
 const SPLITTER_LEAD = 3;
 
@@ -370,16 +374,18 @@ type Goal =
 
 /**
  * Routes every connection; when some fail, routes the whole module again with the
- * failed connections first (they usually lost out to earlier paths) and keeps the best.
+ * failed connections first (they usually lost out to earlier paths) and the rest in a
+ * slightly shuffled order (which belt goes first decides much in a dense module), and
+ * keeps the best.
  */
 export function routeModule(placements: Placement[], options: RouterOptions): RoutingOutput {
     let best: RoutingOutput | null = null;
     let priority: string[] = [];
     const failed = (r: RoutingOutput) => r.routes.filter((x) => !x.ok);
-    const passes = 3;
+    const passes = ROUTE_PASSES;
     for (let pass = 0; pass < passes; pass++) {
         const report = options.onProgress;
-        const result = routeOnce(placements, { ...options, onProgress: report && ((f) => report((pass + f) / passes)) }, priority);
+        const result = routeOnce(placements, { ...options, onProgress: report && ((f) => report((pass + f) / passes)) }, priority, pass);
         if (!best || failed(result).length < failed(best).length) best = result;
         if (failed(best).length === 0) break;
         priority = [...new Set([...failed(result).map((r) => r.key!), ...priority])];
@@ -419,7 +425,7 @@ export function trimDeadEnds(placements: Placement[], io: IoPoint[]): Placement[
     return current;
 }
 
-function routeOnce(placements: Placement[], options: RouterOptions, priority: string[]): RoutingOutput {
+function routeOnce(placements: Placement[], options: RouterOptions, priority: string[], pass = 0): RoutingOutput {
     const all = [...placements];
     const occupancy: Occupancy = new Map();
     all.forEach((p) => addToOccupancy(occupancy, p));
@@ -822,7 +828,14 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
         const i = priority.indexOf(connKey(c));
         return i >= 0 ? i - priority.length : 0;
     };
-    connections.sort((a, b) => rank(a) - rank(b) || distance(a) - distance(b));
+    // Later passes: up to ORDER_SHUFFLE cells added to each distance, the same for the same pass
+    const shuffle = (c: Connection) => {
+        if (pass === 0) return 0;
+        let h = pass;
+        for (const ch of connKey(c)) h = Math.imul(h ^ ch.charCodeAt(0), 2654435761) >>> 0;
+        return (h / 4294967296) * ORDER_SHUFFLE;
+    };
+    connections.sort((a, b) => rank(a) - rank(b) || distance(a) + shuffle(a) - distance(b) - shuffle(b));
 
     let allowNewExit = false;
     for (const [done, conn] of connections.entries()) {
