@@ -8,8 +8,9 @@
  *       Picks random target products (seeded: the same seed gives the same corpus) and a
  *       rate per product that needs a random number of machines, so later products in a
  *       chain get lower rates. Each product is built at a random level between the first
- *       that makes it and the last, with that level's buildings and its best fuel and
- *       fertilizer (highest heat and nutrient value the factory can make by then; raw
+ *       that makes it and the last, with that level's buildings and its best fuel (steam
+ *       once its heaters are unlocked) and fertilizer (highest heat and nutrient value the
+ *       factory can make by then; raw
  *       materials are never fuel), with the cauldron off and (once unlocked) on. Products whose plan has the same structure as one already
  *       taken (same machines, connections and rates, other items) are skipped. A second,
  *       fixed group of dense cases (seed 2, 120–220 machines) stands in for high research.
@@ -31,13 +32,16 @@ import recipesData from "../data/recipes.json";
 import unlocksData from "../data/building-unlocks.json";
 import { analyzeBelts } from "../engine/belt-analysis";
 import { DEFAULT_MODULE_OPTIONS, generateModule, moduleTooBig, unsortableSteps, type ModuleStep } from "../engine/build/generator";
-import { validateLayout } from "../engine/build/layout";
+import { billOfMaterials, validateLayout } from "../engine/build/layout";
 import { stepsFromReport } from "../engine/build/module-steps";
 import { MAX_LEVEL } from "../engine/build/unlocks";
 import { calculatePlan } from "../engine/planner";
+import stackSizes from "../data/stack-sizes.json";
 import type { PlannerConfig } from "../engine/types";
 
 const CORPUS = "bench/corpus.json";
+/** Stack size of a building material the data doesn't name */
+const DEFAULT_STACK = 200;
 /** Machines a case asks for: from small lines to modules that take a while */
 const MACHINES = { min: 8, max: 80 };
 /**
@@ -62,6 +66,9 @@ const label = (c: Pick<Case, "item" | "rate" | "level" | "cauldron">) => `${c.it
 const unlockLevel = (id: string) => (unlocksData as Record<string, { level: number }>)[id]?.level ?? Infinity;
 const CAULDRON_LEVEL = unlockLevel("cauldron");
 const ADVANCED_CAULDRON_LEVEL = unlockLevel("advanced-cauldron");
+/** From the steam heaters on, everything heated runs on steam */
+const STEAM = "steam";
+const STEAM_LEVEL = unlockLevel("steam-heater");
 
 interface Result extends Case {
     machines: number;
@@ -78,6 +85,8 @@ interface Result extends Case {
     stacked: number;
     lifts: number;
     belts: number;
+    /** Inventory slots the building materials take (see data/stack-sizes.json) */
+    slots: number;
     work: number;
     ms: number;
     /** Fingerprint of the layout: equal means the same buildings at the same places */
@@ -87,7 +96,10 @@ interface Result extends Case {
     rejected?: string;
 }
 
-/** No research; fuel and fertilizer made in the factory */
+/**
+ * No research. Fertilizer and steam come from outside (players make them centrally and
+ * hand them out); a solid fuel is made in the factory
+ */
 const config = (c: Case): PlannerConfig => ({
     targets: [{ item: c.item, rate: c.rate }],
     availableResources: [],
@@ -103,8 +115,8 @@ const config = (c: Case): PlannerConfig => ({
     relicKnowledge: 0,
     selectedFuel: c.fuel,
     selectedFertilizer: c.fertilizer,
-    selfFuel: true,
-    selfFertilizer: true,
+    selfFuel: c.fuel !== STEAM,
+    selfFertilizer: false,
     useCauldron: c.cauldron,
     useAdvancedCauldron: c.cauldron && c.level >= ADVANCED_CAULDRON_LEVEL,
     fertilizerReserve: 0.25,
@@ -193,7 +205,7 @@ function suppliesAt(): (level: number, cauldron: boolean) => Supplies {
     return (level, cauldron) => {
         const ready = table.get(cauldron && level >= CAULDRON_LEVEL)!.filter((c) => c.level <= level);
         const best = (value: (c: Candidate) => number) => ready.filter((c) => value(c) > 0).sort((a, b) => value(b) - value(a))[0]?.id ?? "";
-        return { fuel: best((c) => c.heat), fertilizer: best((c) => c.nutrients) };
+        return { fuel: level >= STEAM_LEVEL ? STEAM : best((c) => c.heat), fertilizer: best((c) => c.nutrients) };
     };
 }
 
@@ -257,12 +269,15 @@ function makeCorpus(seed: number, count: number, machines = MACHINES): Case[] {
     return cases;
 }
 
+/** What comes in from outside (see config) */
+const bought = (c: Case) => [c.fertilizer, c.fuel === STEAM ? STEAM : ""].filter(Boolean);
+
 function runCase(c: Case): Result {
     const planned = stepsFor(c)!;
     const reasons = unsortableSteps(planned.steps, { level: c.level });
     if (reasons.length) return { ...c, rejected: reasons.map((st) => st.itemName).join(", ") } as Result;
     const started = performance.now();
-    const mod = generateModule(planned.steps, { ...DEFAULT_MODULE_OPTIONS, beltSpeed: planned.report.beltSpeed, finalProducts: [c.item], unlocks: { level: c.level } });
+    const mod = generateModule(planned.steps, { ...DEFAULT_MODULE_OPTIONS, beltSpeed: planned.report.beltSpeed, finalProducts: [c.item], unlocks: { level: c.level }, boughtItems: bought(c) });
     const ms = Math.round(performance.now() - started);
     const issues = validateLayout(mod.placements);
     const shape = mod.placements.map((p) => [p.id, p.x, p.y, p.z, p.rot].join(",")).sort().join(";");
@@ -280,6 +295,7 @@ function runCase(c: Case): Result {
         stacked: mod.tiers.filter((t) => t.z > 0 && !t.heating).length,
         lifts: mod.placements.filter((p) => p.id === "conveyer-lift-upwards" || p.id === "conveyer-lift-downwards").length,
         belts: mod.placements.filter((p) => p.uid.startsWith("rb-")).length,
+        slots: [...billOfMaterials(mod.placements)].reduce((sum, [item, count]) => sum + Math.ceil(count / ((stackSizes as Record<string, number>)[item] ?? DEFAULT_STACK)), 0),
         work: mod.work ?? 0,
         ms,
         hash: createHash("sha1").update(shape).digest("hex").slice(0, 10),
@@ -358,6 +374,7 @@ function compare(before: Result[], after: Result[]) {
     total("Stacked blocks", (r) => r.stacked ?? 0);
     total("Lifts", (r) => r.lifts);
     total("Belt cells", (r) => r.belts);
+    total("Inventory slots", (r) => r.slots ?? 0);
     total("Routing work", (r) => r.work);
     total("Time (ms)", (r) => r.ms);
 }
