@@ -77,6 +77,8 @@ export interface RouterOptions {
     exportCaps?: Map<string, number>;
     /** Items whose consumers import them although the module makes them (bought fertilizer/fuel that is also a target) */
     bought?: (itemName: string) => boolean;
+    /** Items started from a starter box (self-made fertilizer, heated fuel): every consumer fed by the same producers */
+    primed?: (itemName: string) => boolean;
     /** Items that may also leave through the module's sides (leftovers for a sink), not only front and back */
     sideExit?: (itemName: string) => boolean;
     /** Conveyor lifts may change levels (default: yes) */
@@ -188,6 +190,7 @@ export function assignFlows(
     surplus?: { itemName: string; rate: number }[],
     bought?: (itemName: string) => boolean,
     caps?: Map<string, number>,
+    primed?: (itemName: string) => boolean,
 ): Connection[] {
     const items = new Set(ends.flatMap((e) => e.items.map((i) => i.itemName)));
     const connections: Connection[] = [];
@@ -215,7 +218,9 @@ export function assignFlows(
         // nursery. Producers each feeding other nurseries deadlock: the box reaches only some
         // plants, and the potion needs all of them before any producer runs
         // (whether the rest leaves the module or stays on a consumer's belt: the module comes first)
-        const shared = producers.length > 1 && consumers.length > 0 && totalSupply > totalDemand + 1e-6;
+        // Only for what a starter box primes: everything else is matched in order (every
+        // producer feeding every consumer is a belt for each pair)
+        const shared = !!primed?.(itemName) && producers.length > 1 && consumers.length > 0 && totalSupply > totalDemand + 1e-6;
         if (shared) {
             let needed = 0;
             let covered = 0;
@@ -783,7 +788,7 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
     const entryFed = new Set<string>();
 
     const surplusList: { itemName: string; rate: number }[] = [];
-    const connections = assignFlows(ends, options.exportable, surplusList, options.bought, options.exportCaps);
+    const connections = assignFlows(ends, options.exportable, surplusList, options.bought, options.exportCaps, options.primed);
 
     // An exit that feeds consumers and also exports its surplus gets a priority splitter:
     // consumers first, only the overflow leaves at the edge (a plain split would halve them)

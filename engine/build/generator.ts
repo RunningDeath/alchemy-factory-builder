@@ -1661,6 +1661,14 @@ function routeAndFinish(
     // Reserved anew when modules are joined, so one fluid's network spans all of them
     const withoutPipes = blockPlacements.filter((p) => p.id !== PIPE_ID);
     blockPlacements = [...withoutPipes, ...reservePipeCells(withoutPipes, () => nextUid("pp"))];
+    // What starter boxes prime: self-made fertilizer, and self-made fuel whose own making
+    // needs heat (coke powder from a heated crucible): the stoves need fuel before any is made
+    const isBought = (item: string) => (options.boughtItems ?? []).includes(item);
+    const madeInTiers = new Set(tiers.flatMap((t) => t.lanes.filter((l) => l.kind === "out").flatMap((l) => l.items.map((i) => i.itemName))));
+    const nurseryFeed = new Set(tiers.filter((t) => t.deviceId.includes("nursery")).flatMap((t) => t.lanes.filter((l) => l.kind === "in").flatMap((l) => l.items.map((i) => i.itemName))));
+    const fertilizers = [...nurseryFeed].filter((item) => madeInTiers.has(item) && !isBought(item));
+    const fuels = [...heatedFuels(tiers)].filter((item) => !isBought(item));
+    const primed = new Set([...fertilizers, ...fuels]);
     // Belt the blocks to each other, to the imports and to the exports
     const routed = blockPlacements.length
         ? routeModule(blockPlacements, {
@@ -1679,6 +1687,7 @@ function routeAndFinish(
               exportable: (item) => finals.has(item) || products.has(item) || chosen.has(item) || leftovers.has(item),
               sideExit: (item) => leftovers.has(item) && !finals.has(item) && !chosen.has(item),
               bought: (item) => (options.boughtItems ?? []).includes(item),
+              primed: (item) => primed.has(item),
               exportCaps: options.exportCaps,
           })
         : { placements: [], routes: [], io: [], surplus: [] };
@@ -1691,13 +1700,10 @@ function routeAndFinish(
     routed.io = disposed.io;
     if (finish) {
         // Self-made fertilizer: a box in the nurseries' feed the player fills once to start
-        const made = new Set(tiers.flatMap((t) => t.lanes.filter((l) => l.kind === "out").flatMap((l) => l.items.map((i) => i.itemName))));
-        const fertilizers = new Set(tiers.filter((t) => t.deviceId.includes("nursery")).flatMap((t) => t.lanes.filter((l) => l.kind === "in").flatMap((l) => l.items.map((i) => i.itemName))));
         // (the blocks' own box moves to the outline when a spot there feeds every nursery too)
-        for (const item of fertilizers) if (made.has(item) && !(options.boughtItems ?? []).includes(item)) routed.placements = placeStarterBox(routed.placements, item, options.maxHeight, () => nextUid("sb"));
-        // Self-made fuel whose own making needs heat (coke powder from a heated crucible): the
-        // stoves need fuel before any is made, so a box in their feed too
-        for (const item of heatedFuels(tiers)) if (!(options.boughtItems ?? []).includes(item)) routed.placements = placeStarterBox(routed.placements, item, options.maxHeight, () => nextUid("sb"), (p) => p.id === STOVE_ID);
+        for (const item of fertilizers) routed.placements = placeStarterBox(routed.placements, item, options.maxHeight, () => nextUid("sb"));
+        // Self-made fuel made with heat: a box in the stoves' feed too
+        for (const item of fuels) routed.placements = placeStarterBox(routed.placements, item, options.maxHeight, () => nextUid("sb"), (p) => p.id === STOVE_ID);
         // Rows and columns that only pass belts straight through go before the supports get cheaper
         const compact = removeStraightLines({ placements: routed.placements, io: routed.io, tiers });
         // Pipe networks through what the belts left free, before supports fill any of it
