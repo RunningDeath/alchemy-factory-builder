@@ -294,7 +294,7 @@ function runCase(c: Case): Result {
         // Heated blocks stand on their heaters (z 1) but never on other blocks
         stacked: mod.tiers.filter((t) => t.z > 0 && !t.heating).length,
         lifts: mod.placements.filter((p) => p.id === "conveyer-lift-upwards" || p.id === "conveyer-lift-downwards").length,
-        belts: mod.placements.filter((p) => p.uid.startsWith("rb-")).length,
+        belts: mod.placements.filter((p) => /(^|\.)rb-/.test(p.uid)).length,
         slots: [...billOfMaterials(mod.placements)].reduce((sum, [item, count]) => sum + Math.ceil(count / ((stackSizes as Record<string, number>)[item] ?? DEFAULT_STACK)), 0),
         work: mod.work ?? 0,
         ms,
