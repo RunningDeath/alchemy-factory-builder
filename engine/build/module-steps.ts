@@ -40,9 +40,16 @@ function machinesFor(info: NodeBeltInfo): number {
 const heatingKind = (item: string) => (isFluidItem(item) ? "steam" : "stove");
 
 /**
- * Fuel for a heated step: the incoming edge whose item isn't one of the recipe inputs.
- * When the fuel is also an ingredient (planks for charcoal) both share one edge; the
- * fuel is then what the edge carries beyond the recipe's share.
+ * Least fuel a heated step's belt carries: a strong fuel (a panacea potion) lasts so long
+ * that the plan's rate rounds to nothing, but the stoves still need a fuel belt
+ */
+const MIN_FUEL_RATE = 0.01;
+
+/**
+ * Fuel for a heated step: the plan's selected fuel, at the rate of its incoming edges. When
+ * the fuel is also an ingredient (coal for coke) both share one edge; the fuel is then what
+ * the edge carries beyond the recipe's share. Without a selected fuel: the incoming edge
+ * whose item isn't one of the recipe inputs.
  */
 function heatingFor(report: BeltReport, info: NodeBeltInfo, fuel?: string): ModuleStep["heating"] {
     if (info.deviceId && HEATED_MACHINES.has(info.deviceId)) return cauldronHeating(info, fuel);
@@ -52,15 +59,19 @@ function heatingFor(report: BeltReport, info: NodeBeltInfo, fuel?: string): Modu
         .map(([edge, flow]) => ({ source: splitEdgeKey(edge)[0], target: splitEdgeKey(edge)[1], flow }))
         .filter((e) => e.target === info.nodeKey)
         .map((e) => ({ item: report.nodes[e.source]?.itemName, demand: e.flow.demand }));
-    const separate = incoming.find((e) => e.item && !recipeInputs.has(e.item));
-    if (separate?.item) return { kind: heatingKind(separate.item), fuelItem: separate.item, fuelRate: separate.demand };
-    if (!fuel || !recipeInputs.has(fuel)) return undefined;
-    // Recipe share: the node's output rate times inputs per output
-    const input = info.perMachineInputs.find((f) => f.itemName === fuel)!;
-    const output = info.perMachineOutputs.find((f) => f.itemName === info.itemName) ?? info.perMachineOutputs[0];
-    const recipeShare = output?.perMachineRate ? (info.demandRate * input.perMachineRate) / output.perMachineRate : 0;
+    if (!fuel) {
+        const separate = incoming.find((e) => e.item && !recipeInputs.has(e.item));
+        return separate?.item ? { kind: heatingKind(separate.item), fuelItem: separate.item, fuelRate: Math.max(MIN_FUEL_RATE, separate.demand) } : undefined;
+    }
     const demand = incoming.filter((e) => e.item === fuel).reduce((sum, e) => sum + e.demand, 0);
-    return { kind: heatingKind(fuel), fuelItem: fuel, fuelRate: Math.max(0, demand - recipeShare) };
+    let recipeShare = 0;
+    if (recipeInputs.has(fuel)) {
+        // Recipe share: the node's output rate times inputs per output
+        const input = info.perMachineInputs.find((f) => f.itemName === fuel)!;
+        const output = info.perMachineOutputs.find((f) => f.itemName === info.itemName) ?? info.perMachineOutputs[0];
+        recipeShare = output?.perMachineRate ? (info.demandRate * input.perMachineRate) / output.perMachineRate : 0;
+    }
+    return { kind: heatingKind(fuel), fuelItem: fuel, fuelRate: Math.max(MIN_FUEL_RATE, demand - recipeShare) };
 }
 
 /** Cauldrons heat per craft: steam pads with steam, stoves with any other fuel */
@@ -69,7 +80,7 @@ function cauldronHeating(info: NodeBeltInfo, fuel?: string): ModuleStep["heating
     const heatValue = getItem(fuelItem)?.heat_value ?? 0;
     const product = getItem(info.itemName)?.id ?? info.itemName;
     const heatPerMinute = info.demandRate * cauldronHeatFor(product);
-    return { kind: heatingKind(fuelItem), fuelItem, fuelRate: heatValue > 0 ? heatPerMinute / heatValue : 0 };
+    return { kind: heatingKind(fuelItem), fuelItem, fuelRate: Math.max(MIN_FUEL_RATE, heatValue > 0 ? heatPerMinute / heatValue : 0) };
 }
 
 const flows = (list: NodeBeltInfo["perMachineInputs"], fluid: boolean, load = 1) =>
@@ -88,8 +99,10 @@ function loadOf(info: NodeBeltInfo): number {
     return capacity > 0 ? Math.min(1, taken / capacity) : 1;
 }
 
-/** `fuel`: the plan's selected fuel, for heated steps that also use it as an ingredient */
+/** `fuel`: the plan's selected fuel (id or name), for heated steps that also use it as an ingredient */
 export function stepsFromReport(report: BeltReport, fuel?: string): ModuleStep[] {
+    // The config keeps the item id ("coal"), the report item names ("Coal")
+    const fuelName = fuel ? (getItem(fuel)?.name ?? fuel) : undefined;
     return productionOrder(report)
         .map((key) => report.nodes[key])
         .filter((info) => info.deviceId && getFootprint(info.deviceId) && machinesFor(info) > 0)
@@ -102,6 +115,6 @@ export function stepsFromReport(report: BeltReport, fuel?: string): ModuleStep[]
             outputs: flows(info.perMachineOutputs, false, loadOf(info)),
             fluidInputs: info.perMachineInputs.filter((f) => f.isFluid).map((f) => f.itemName),
             fluids: { inputs: flows(info.perMachineInputs, true, loadOf(info)), outputs: flows(info.perMachineOutputs, true, loadOf(info)) },
-            heating: heatingFor(report, info, fuel),
+            heating: heatingFor(report, info, fuelName),
         }));
 }

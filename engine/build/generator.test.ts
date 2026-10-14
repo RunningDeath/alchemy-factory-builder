@@ -4,7 +4,7 @@ import { analyzeBelts } from "../belt-analysis";
 import { PlannerConfig } from "../types";
 import { beltPieceFor } from "./belt-pieces";
 import { getFootprint } from "./footprint";
-import { DEFAULT_MODULE_OPTIONS, generateModule, machineRotation, moduleTooBig, stackingFor, type GeneratedModule, type ModuleStep } from "./generator";
+import { DEFAULT_MODULE_OPTIONS, generateModule, machineRotation, moduleTooBig, stackingFor, UnbuildableError, type GeneratedModule, type ModuleStep } from "./generator";
 import { portConnections, validateLayout } from "./layout";
 import { stepsFromReport } from "./module-steps";
 
@@ -279,6 +279,75 @@ describe("separate inputs, filters and heating", () => {
   test("a heated machine without a heating device under it is flagged", () => {
     const issues = validateLayout([{ uid: "c", id: "crucible", x: 0, y: 0, z: 0, rot: 0 }]);
     expect(issues.map((i) => i.kind)).toContain("unheated");
+  });
+});
+
+describe("starter boxes", () => {
+  test("self-made fuel whose making needs heat (coke powder from a heated crucible) gets a box in the stoves' feed", () => {
+    const cfg: PlannerConfig = {
+      targets: [{ item: "Copper Ingot", rate: 6 }],
+      availableResources: [],
+      fuelEfficiency: 0,
+      alchemySkill: 0,
+      factoryEfficiency: 0,
+      logisticsEfficiency: 0,
+      throwingEfficiency: 0,
+      fertilizerEfficiency: 0,
+      salesAbility: 0,
+      negotiationSkill: 0,
+      customerMgmt: 0,
+      relicKnowledge: 0,
+      selectedFuel: "cokepowder",
+      selfFuel: true,
+      selectedFertilizer: "",
+      selfFertilizer: true,
+    };
+    const report = analyzeBelts(calculatePlan(cfg), cfg, { planParallelLines: true, machineRounding: "up" });
+    const steps = stepsFromReport(report, cfg.selectedFuel);
+    expect(steps.some((s) => s.itemName === "Coke Powder")).toBe(true);
+    const mod = generateModule(steps, { ...options, beltSpeed: report.beltSpeed, unlocks: { level: 5 } });
+    expect(mod.placements.filter((p) => p.starterBox).map((p) => p.label)).toContain("Starter box: Coke Powder");
+    expect(validateLayout(mod.placements)).toEqual([]);
+  }, 120_000);
+});
+
+describe("unbuildable plans", () => {
+  test("a byproduct on the product's belt before filters are unlocked: declined, not laid out broken", () => {
+    const crusher = step({
+      deviceId: "stone-crusher",
+      itemName: "Salt",
+      inputs: [{ itemName: "Rock Salt", perMachineRate: 30 }],
+      outputs: [
+        { itemName: "Salt", perMachineRate: 30 },
+        { itemName: "Sand", perMachineRate: 10 },
+      ],
+    });
+    expect(() => generateModule([crusher], { ...options, unlocks: { level: 4 } })).toThrow(UnbuildableError);
+    expect(() => generateModule([crusher], { ...options, unlocks: { level: 5 } })).not.toThrow();
+  });
+});
+
+describe("determinism", () => {
+  test("the same plan gives the same module, run after run", () => {
+    const steps = [
+      step({
+        deviceId: "athanor",
+        machines: 4,
+        inputs: [
+          { itemName: "Iron Ingot", perMachineRate: 20 },
+          { itemName: "Coke Powder", perMachineRate: 20 },
+        ],
+        outputs: [{ itemName: "Steel Ingot", perMachineRate: 20 }],
+        heating: { kind: "steam", fuelItem: "Steam", fuelRate: 60 },
+      }),
+    ];
+    const shape = () => {
+      const mod = generateModule(steps, options);
+      return { cells: mod.placements.map((p) => `${p.id}@${p.x},${p.y},${p.z}r${p.rot}`).sort(), work: mod.work };
+    };
+    const first = shape();
+    expect(first.work).toBeGreaterThan(0);
+    expect(shape()).toEqual(first);
   });
 });
 

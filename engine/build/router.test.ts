@@ -63,13 +63,22 @@ describe("assignFlows", () => {
   test("self-made fertilizer: as few producers as cover the module feed every consumer, the rest leaves", () => {
     // Two blenders (20/min each) feed three nursery groups (17/min together) and export the rest.
     // Each blender feeding other nurseries deadlocks: the starter box reaches only some plants
-    const flows = assignFlows([end("b1", "out", 20, 0), end("b2", "out", 20, 5), end("n1", "in", 9, 0), end("n2", "in", 6, 3), end("n3", "in", 2, 6)]);
+    const flows = assignFlows([end("b1", "out", 20, 0), end("b2", "out", 20, 5), end("n1", "in", 9, 0), end("n2", "in", 6, 3), end("n3", "in", 2, 6)], undefined, undefined, undefined, undefined, () => true);
     const fed = (uid: string) => flows.filter((f) => f.to !== "export" && f.from !== "import" && f.from.uid === uid).map((f) => (f.to as LaneEnd).uid);
     expect(fed("b1").sort()).toEqual(["n1", "n2", "n3"]);
     expect(fed("b2")).toEqual([]);
     const exported = (uid: string) => flows.filter((f) => f.to === "export" && f.from !== "import" && f.from.uid === uid).reduce((s, f) => s + f.rate, 0);
     expect(exported("b1")).toBeCloseTo(3, 6);
     expect(exported("b2")).toBeCloseTo(20, 6);
+  });
+
+  test("self-made fertilizer that doesn't leave the module: the module is fed first all the same", () => {
+    // Nothing may be exported (the rest stays on a consumer's belt). Matched greedily, b1 would
+    // feed n1 and n2 only and b2 the rest: one starter box reaches only some nurseries
+    const flows = assignFlows([end("b1", "out", 10, 0), end("b2", "out", 20, 5), end("n1", "in", 9, 0), end("n2", "in", 6, 3), end("n3", "in", 2, 6)], () => false, [], undefined, undefined, () => true);
+    const fed = (uid: string) => [...new Set(flows.filter((f) => f.from !== "import" && f.to !== "export" && f.from.uid === uid && !f.surplus).map((f) => (f.to as LaneEnd).uid))].sort();
+    expect(fed("b1")).toEqual(["n1", "n2", "n3"]);
+    expect(fed("b2")).toEqual(["n1", "n2", "n3"]);
   });
 
   test("rounded-up consumers share what is made instead of importing the difference", () => {

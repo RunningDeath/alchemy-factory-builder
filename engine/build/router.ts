@@ -38,6 +38,8 @@ export interface RouteResult {
     to: string;
     rate: number;
     ok: boolean;
+    /** Why a connection failed: no usable start cell, no way through free cells, the search ran out of steps, or the path found couldn't be built */
+    reason?: "no-start" | "no-way" | "search-limit" | "commit";
     /** Identifies the connection across routing passes */
     key?: string;
 }
@@ -75,6 +77,8 @@ export interface RouterOptions {
     exportCaps?: Map<string, number>;
     /** Items whose consumers import them although the module makes them (bought fertilizer/fuel that is also a target) */
     bought?: (itemName: string) => boolean;
+    /** Items started from a starter box (self-made fertilizer, heated fuel): every consumer fed by the same producers */
+    primed?: (itemName: string) => boolean;
     /** Items that may also leave through the module's sides (leftovers for a sink), not only front and back */
     sideExit?: (itemName: string) => boolean;
     /** Conveyor lifts may change levels (default: yes) */
@@ -88,6 +92,10 @@ export interface RouterOptions {
 }
 
 const PRIORITY_SPLITTER = "splitter-vert";
+/** Routing passes per layout: failed connections first in each next one */
+const ROUTE_PASSES = 6;
+/** Most cells a later pass adds to a connection's distance to vary the order */
+const ORDER_SHUFFLE = 20;
 /** How far from its exit a priority splitter may stand when it doesn't fit right there */
 const SPLITTER_LEAD = 3;
 
@@ -107,7 +115,28 @@ const LIFT = {
 };
 
 const BELT_LAYERS = 3; // bottom + middle
-const MAX_EXPANSIONS = 200_000;
+const MAX_EXPANSIONS = 1_000_000;
+/** Cells a connection's search avoids, one by one, when its path takes a cell twice */
+const CROSSING_RETRIES = 3;
+
+/**
+ * Search steps done so far, over all routing: the generator's measure of effort. Unlike a
+ * clock it is the same on every machine, so the same plan always gives the same module.
+ */
+let searchSteps = 0;
+export const routingWork = () => searchSteps;
+/** Search steps after which every search gives up at once (see withWorkLimit) */
+let workLimit = Infinity;
+/** Run `fn` with searches cut off once `limit` more steps are spent; the rest fails as search-limit */
+export function withWorkLimit<T>(limit: number, fn: () => T): T {
+    const outer = workLimit;
+    workLimit = Math.min(outer, searchSteps + limit);
+    try {
+        return fn();
+    } finally {
+        workLimit = outer;
+    }
+}
 /** A lift costs as much as 8 belt cells: fewer lifts, but no long detours around blocks either */
 const LIFT_COST = 8;
 /** Per support cell under a raised belt or lift: tall columns turn into walls, so stay low and lift late */
@@ -165,6 +194,7 @@ export function assignFlows(
     surplus?: { itemName: string; rate: number }[],
     bought?: (itemName: string) => boolean,
     caps?: Map<string, number>,
+    primed?: (itemName: string) => boolean,
 ): Connection[] {
     const items = new Set(ends.flatMap((e) => e.items.map((i) => i.itemName)));
     const connections: Connection[] = [];
@@ -191,7 +221,10 @@ export function assignFlows(
         // consumer, so their back flows reach all of them: one starter box upstream starts every
         // nursery. Producers each feeding other nurseries deadlock: the box reaches only some
         // plants, and the potion needs all of them before any producer runs
-        const shared = producers.length > 1 && consumers.length > 0 && totalSupply > totalDemand + 1e-6 && (exportable?.(itemName) ?? true);
+        // (whether the rest leaves the module or stays on a consumer's belt: the module comes first)
+        // Only for what a starter box primes: everything else is matched in order (every
+        // producer feeding every consumer is a belt for each pair)
+        const shared = !!primed?.(itemName) && producers.length > 1 && consumers.length > 0 && totalSupply > totalDemand + 1e-6;
         if (shared) {
             let needed = 0;
             let covered = 0;
@@ -341,16 +374,18 @@ type Goal =
 
 /**
  * Routes every connection; when some fail, routes the whole module again with the
- * failed connections first (they usually lost out to earlier paths) and keeps the best.
+ * failed connections first (they usually lost out to earlier paths) and the rest in a
+ * slightly shuffled order (which belt goes first decides much in a dense module), and
+ * keeps the best.
  */
 export function routeModule(placements: Placement[], options: RouterOptions): RoutingOutput {
     let best: RoutingOutput | null = null;
     let priority: string[] = [];
     const failed = (r: RoutingOutput) => r.routes.filter((x) => !x.ok);
-    const passes = 3;
+    const passes = ROUTE_PASSES;
     for (let pass = 0; pass < passes; pass++) {
         const report = options.onProgress;
-        const result = routeOnce(placements, { ...options, onProgress: report && ((f) => report((pass + f) / passes)) }, priority);
+        const result = routeOnce(placements, { ...options, onProgress: report && ((f) => report((pass + f) / passes)) }, priority, pass);
         if (!best || failed(result).length < failed(best).length) best = result;
         if (failed(best).length === 0) break;
         priority = [...new Set([...failed(result).map((r) => r.key!), ...priority])];
@@ -390,7 +425,7 @@ export function trimDeadEnds(placements: Placement[], io: IoPoint[]): Placement[
     return current;
 }
 
-function routeOnce(placements: Placement[], options: RouterOptions, priority: string[]): RoutingOutput {
+function routeOnce(placements: Placement[], options: RouterOptions, priority: string[], pass = 0): RoutingOutput {
     const all = [...placements];
     const occupancy: Occupancy = new Map();
     all.forEach((p) => addToOccupancy(occupancy, p));
@@ -451,9 +486,11 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
     };
 
     /** `levels`: heights a lift may go to (the ground, the starts and the goals of this connection) */
+    let lastFailure: RouteResult["reason"];
     function search(starts: Start[], goal: (cell: Cell, heading: Side) => Goal | null, estimate: (c: Cell) => number, levels: number[]): { end: SearchNode; goal: Goal } | null {
         const open = new Heap();
         const best = new Map<string, number>();
+        lastFailure = "no-start";
         const h = (c: Cell) => estimate(c) * 1.5;
         const supportMemo = new Map<string, number | null>();
         const supports = (c: Cell) => {
@@ -488,11 +525,14 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
                 const g = goal(s.cell, heading);
                 if (g) return { end: node, goal: g };
                 open.push(node);
+                lastFailure = "no-way";
             }
         }
 
         let expansions = 0;
         while (open.size > 0 && expansions++ < MAX_EXPANSIONS) {
+            if (searchSteps >= workLimit) break;
+            searchSteps++;
             const cur = open.pop();
             const stateKey = `${keyOf(cur.cell)}:${cur.heading}`;
             if ((best.get(stateKey) ?? Infinity) <= cur.g - 1e-9) continue;
@@ -562,16 +602,18 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
                 }
             }
         }
+        if (expansions > MAX_EXPANSIONS || searchSteps >= workLimit) lastFailure = "search-limit";
         return null;
     }
 
-    function commit(endNode: SearchNode, goal: Goal, conn: Connection, sourceId: string, sinkId: string, tree?: string) {
+    /**
+     * The first cell a path takes twice (a lift shaft through its own belt), or null. The
+     * search knows cells and headings, not the path behind them, so it can find such a path
+     */
+    function crossing(endNode: SearchNode): string | null {
+        const used = new Set<string>();
         const steps: SearchNode[] = [];
         for (let n: SearchNode | null = endNode; n; n = n.parent) steps.unshift(n);
-        const start = (steps[0] as SearchNode & { start?: Start }).start!;
-
-        // Reject paths that cross themselves
-        const used = new Set<string>();
         for (const s of steps) {
             const st = s.step;
             const keys =
@@ -581,10 +623,19 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
                       ? bridgeCells(st.anchor, st.heading).map(keyOf)
                       : Array.from({ length: Math.abs(st.exitZ - st.entry[2]) + 1 }, (_, i) => keyOf([st.entry[0], st.entry[1], Math.min(st.exitZ, st.entry[2]) + i]));
             for (const k of keys) {
-                if (used.has(k)) return false;
+                if (used.has(k)) return k;
                 used.add(k);
             }
         }
+        return null;
+    }
+
+    function commit(endNode: SearchNode, goal: Goal, conn: Connection, sourceId: string, sinkId: string, tree?: string) {
+        const steps: SearchNode[] = [];
+        for (let n: SearchNode | null = endNode; n; n = n.parent) steps.unshift(n);
+        const start = (steps[0] as SearchNode & { start?: Start }).start!;
+        // Paths that cross themselves can't be built
+        if (crossing(endNode)) return false;
 
         const created: RouteNode[] = [];
         for (const s of steps) {
@@ -718,13 +769,18 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
             }
             const cells: Cell[] = [start, add(start, dir)].flatMap((c) => [c, [c[0], c[1], c[2] + 1] as Cell]);
             if (![...leadCells, ...cells].every(free)) continue;
+            // Its two outputs need room for their belts (another splitter may already stand there)
+            const out = add(add(start, dir), dir);
+            if (![out, [out[0], out[1], out[2] + 1] as Cell].every(free)) continue;
+            // Its bottom cells and the belt leading to it need supports down to the ground (not
+            // onto a machine that can't carry them)
+            if (![...leadCells, start, add(start, dir)].every((c) => supportCost(occupancy, c[0], c[1], c[2]) !== null)) continue;
             const xs = cells.map((c) => c[0]);
             const ys = cells.map((c) => c[1]);
             // Unrotated: in on the left, both outputs on the right (lower first, upper second)
             const placement: Placement = { uid: makeUid("p"), id: PRIORITY_SPLITTER, x: Math.min(...xs), y: Math.min(...ys), z: exit.port[2], rot: rotFor("right", dir), label: itemName, lane: "route" };
             const piece = beltPieceFor([oppositeSide(dir)], [dir])!;
             const belts: Placement[] = leadCells.map((c) => ({ uid: makeUid("b"), id: piece.id, x: c[0], y: c[1], z: c[2], rot: piece.rot, label: itemName, lane: "route" }));
-            const out = add(add(start, dir), dir);
             const end = (z: number, suffix: string): LaneEnd => ({ uid: `${placement.uid}:${suffix}`, kind: "out", items: exit.items, port: [out[0], out[1], z], dir, block: exit.block });
             return { placement, belts, cells: [...leadCells, ...cells], base: [...leadCells, start, add(start, dir)], first: end(exit.port[2], "first"), overflow: end(exit.port[2] + 1, "overflow") };
         }
@@ -738,7 +794,7 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
     const entryFed = new Set<string>();
 
     const surplusList: { itemName: string; rate: number }[] = [];
-    const connections = assignFlows(ends, options.exportable, surplusList, options.bought, options.exportCaps);
+    const connections = assignFlows(ends, options.exportable, surplusList, options.bought, options.exportCaps, options.primed);
 
     // An exit that feeds consumers and also exports its surplus gets a priority splitter:
     // consumers first, only the overflow leaves at the edge (a plain split would halve them)
@@ -772,7 +828,14 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
         const i = priority.indexOf(connKey(c));
         return i >= 0 ? i - priority.length : 0;
     };
-    connections.sort((a, b) => rank(a) - rank(b) || distance(a) - distance(b));
+    // Later passes: up to ORDER_SHUFFLE cells added to each distance, the same for the same pass
+    const shuffle = (c: Connection) => {
+        if (pass === 0) return 0;
+        let h = pass;
+        for (const ch of connKey(c)) h = Math.imul(h ^ ch.charCodeAt(0), 2654435761) >>> 0;
+        return (h / 4294967296) * ORDER_SHUFFLE;
+    };
+    connections.sort((a, b) => rank(a) - rank(b) || distance(a) + shuffle(a) - distance(b) - shuffle(b));
 
     let allowNewExit = false;
     for (const [done, conn] of connections.entries()) {
@@ -872,6 +935,14 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
             allowNewExit = true;
             found = search(starts, goal, estimate, levels);
         }
+        // A path through itself: search again without the cell it takes twice
+        const avoided: string[] = [];
+        for (let k = found ? crossing(found.end) : null; found && k && avoided.length < CROSSING_RETRIES; k = found ? crossing(found.end) : null) {
+            avoided.push(k);
+            reserved.add(k);
+            found = search(starts, goal, estimate, levels);
+        }
+        avoided.forEach((k) => reserved.delete(k));
         allowNewExit = false;
         let ok = false;
         if (found) {
@@ -906,7 +977,7 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
             if (!connected) reserveEnd(e);
         }
         // Surplus that finds no way to a consumer just stays where it is (it was optional)
-        if (ok || !conn.surplus) routes.push({ itemName: conn.itemName, from: endName(conn.from), to: endName(conn.to), rate: conn.rate, ok, key: connKey(conn) });
+        if (ok || !conn.surplus) routes.push({ itemName: conn.itemName, from: endName(conn.from), to: endName(conn.to), rate: conn.rate, ok, key: connKey(conn), ...(!ok && { reason: found ? "commit" : lastFailure }) });
     }
 
     // Merge surplus per item

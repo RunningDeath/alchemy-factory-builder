@@ -4,7 +4,7 @@
  * wood block and lab stand columns down to whatever is below (machine tops that take a
  * load, or the ground); lab stands let lane belts underneath keep running.
  */
-import { cellKey, cellsCollide, placementCells, type Placement } from "./layout";
+import { buildOccupancy, cellKey, cellsCollide, placementCells, type Placement } from "./layout";
 import { transformBlock } from "./packing";
 import { findLaneEnds } from "./router";
 import { addToOccupancy, isSupported, supportColumn, type Occupancy } from "./supports";
@@ -44,8 +44,6 @@ export interface TowerBlock {
     kind?: string;
     /** Small machines (grinders): blocks of them don't stack on each other, each would need its own lifts */
     small?: boolean;
-    /** Production stage: a block stacks only near its own part of the chain */
-    stage?: number;
 }
 
 interface TowerOptions {
@@ -66,12 +64,6 @@ const RELATED_BONUS = 6;
 const SAME_KIND_BONUS = 5;
 /** Per level up: high blocks mean long lifts and belts on tall columns */
 const HEIGHT_COST = 0.5;
-/**
- * Most production stages between an upper block and the tower it stands on, unless they
- * exchange items: a late block on an early one sits far from its feeders, its belts run
- * across the module
- */
-const MAX_STAGE_GAP = 2;
 
 /**
  * Lane ends a connecting belt can't reach: the cell in front of the end is taken, or (up
@@ -87,16 +79,22 @@ function blockedEnds(placements: Placement[]): number {
             occupied.add(`${c.x},${c.y},${c.z}`);
             if (p.id !== "frame-single") above.set(`${c.x},${c.y}`, Math.max(above.get(`${c.x},${c.y}`) ?? -1, c.z));
         }
-    const shaftFree = (x: number, y: number, z: number) => {
-        for (let k = 0; k <= z; k++) if (occupied.has(`${x},${y},${k}`)) return false;
+    const occupancy = buildOccupancy(placements);
+    // The belt at a lane end stands on a support column: free cells down to the ground or to
+    // something that carries it (the router builds nothing else there; a free shaft beside it
+    // doesn't hold the belt)
+    const supportable = (x: number, y: number, z: number) => {
+        for (let k = z - 1; k >= 0; k--) {
+            const cells = occupancy.get(cellKey(x, y, k)) ?? [];
+            if (cells.length) return isSupported(occupancy, x, y, k + 1);
+        }
         return true;
     };
     return findLaneEnds(placements).filter(({ port: [x, y, z] }) => {
         if (occupied.has(`${x},${y},${z}`)) return true;
         // Nothing but lab stands over the cell in front of a lane end: the belt comes in there
         if ((above.get(`${x},${y}`) ?? -1) > z) return true;
-        if (z === 0) return false;
-        return ![[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].some(([ox, oy]) => shaftFree(x + ox, y + oy, z - 1));
+        return !supportable(x, y, z);
     }).length;
 }
 
@@ -269,10 +267,7 @@ export function buildTowers(blocks: TowerBlock[], opts: TowerOptions): Tower[] {
             const tower = towers[t];
             if (!tower || t === i || tower.members.some((m) => blocks[m.index].canCarry === false || blocks[m.index].group !== blocks[i].group)) continue;
             if (sameOnly && !tower.members.every((m) => blocks[m.index].kind === blocks[i].kind)) continue;
-            const related = tower.members.some((m) => opts.related(m.index, i));
             if (blocks[i].small && tower.members.some((m) => blocks[m.index].small)) continue;
-            const stage = blocks[i].stage;
-            if (!related && stage !== undefined && tower.members.every((m) => Math.abs((blocks[m.index].stage ?? stage) - stage) > MAX_STAGE_GAP)) continue;
             const key = `${t}|${version[t]}|${i}`;
             if (!memo.has(key)) {
             let towerBest: Candidate | null = null;
@@ -280,6 +275,7 @@ export function buildTowers(blocks: TowerBlock[], opts: TowerOptions): Tower[] {
             const top = topMap(tower.placements);
             const apart = [...tower.placements, ...upper.placements.map((p) => ({ ...p, x: p.x + 10000 }))];
             const blockedBefore = blockedEnds(apart);
+            const related = tower.members.some((m) => opts.related(m.index, i));
             const sameKind = !!blocks[i].kind && tower.members.some((m) => blocks[m.index].kind === blocks[i].kind);
             // Up to a few cells past the edge, so the upper block's lane ends can reach down
             const xs = [Math.min(0, tower.width - upper.width) - OVERHANG, Math.max(0, tower.width - upper.width) + OVERHANG];

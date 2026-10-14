@@ -11,7 +11,8 @@
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "build-footprints": "bun run scripts/build-footprints.ts",
-    "build-unlocks": "bun run scripts/build-unlocks.ts"
+    "build-unlocks": "bun run scripts/build-unlocks.ts",
+    "benchmark": "bun run scripts/benchmark.ts"
   },
   "dependencies": {
     "@dagrejs/dagre": "1.1.8",
