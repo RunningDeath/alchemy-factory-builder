@@ -142,11 +142,11 @@
       <path class="belt" d="M580 115 V60 H640"/><path class="belt" d="M580 115 V170 H640"/>
       <rect class="m" x="640" y="40" width="100" height="40" rx="6"/><text x="690" y="65" text-anchor="middle" font-size="13">Sage</text>
       <rect class="m" x="640" y="150" width="100" height="40" rx="6"/><text x="690" y="175" text-anchor="middle" font-size="13">Redcurrant</text>
-      <text x="586" y="100" font-size="11" class="good">T: ½</text><text x="586" y="140" font-size="11" class="good">T: ½</text>
+      <text x="586" y="100" font-size="11" class="good">½</text><text x="586" y="140" font-size="11" class="good">½</text>
       <text x="575" y="215" text-anchor="middle" font-size="12" class="good">box reaches every plant</text>
       <text x="455" y="160" text-anchor="middle" font-size="11" class="muted">Blender B → export</text>
     </svg>
-    <figcaption>The Redcurrant case: two blenders fed different nurseries, and the starter box sat on only one of their back flows. Now one producer feeds all nurseries (if it can), and T-splits share evenly. <span class="tag t-player">Player</span></figcaption>
+    <figcaption>The Redcurrant case: two blenders fed different nurseries, and the starter box sat on only one of their back flows. Now one producer feeds all nurseries (if it can); plain belt splits share evenly. <span class="tag t-player">Player</span></figcaption>
   </figure>
 
   <h2 id="heat">4. Heat</h2>
@@ -249,15 +249,15 @@
   <div class="grid">
     <figure class="card" style="grid-column: 1 / -1">
       <svg viewBox="0 0 720 240" role="img" aria-label="Split with a straight output, T-split and merge, with the direction of every belt">
-        <text x="10" y="20" font-weight="700" font-size="14">Split with a straight output</text>
+        <text x="10" y="20" font-weight="700" font-size="14">Split: straight + side</text>
         <path class="belt" d="M20 90 H210"/><path class="belt" d="M110 90 V175"/>
         <polygon class="arrow" points="46,84 58,90 46,96"/><polygon class="arrow" points="196,84 208,90 196,96"/><polygon class="arrow" points="104,161 110,173 116,161"/>
         <text x="20" y="74" font-size="12" class="muted">in</text>
-        <text x="150" y="74" font-size="12" class="good">straight: everything</text>
-        <text x="120" y="140" font-size="12" class="bad">side: only when</text>
-        <text x="120" y="156" font-size="12" class="bad">straight backs up</text>
+        <text x="185" y="74" font-size="13" class="good">½</text>
+        <text x="120" y="150" font-size="13" class="good">½</text>
+        <text x="20" y="225" font-size="12" class="good">shares evenly too</text>
         <line x1="240" y1="30" x2="240" y2="225" class="grid"/>
-        <text x="255" y="20" font-weight="700" font-size="14">T-split (no straight output)</text>
+        <text x="255" y="20" font-weight="700" font-size="14">Split: left + right (T)</text>
         <path class="belt" d="M360 190 V90"/><path class="belt" d="M260 90 H460"/>
         <polygon class="arrow" points="354,154 360,142 366,154"/><polygon class="arrow" points="274,84 262,90 274,96"/><polygon class="arrow" points="446,84 458,90 446,96"/>
         <text x="370" y="185" font-size="12" class="muted">in from below</text>
@@ -272,7 +272,7 @@
         <text x="640" y="74" font-size="12">out</text>
         <text x="500" y="225" font-size="12" class="muted">two belts join, one leaves</text>
       </svg>
-      <figcaption>The same belt shape is a split or a merge depending on which way the branch runs. A <b>split with a straight output</b> sends everything straight on; the side branch only gets items once the straight path backs up, so along a feed line the <b>end</b> fills first. A <b>T-split</b> has no straight output (the belt comes in from the side and leaves both ways) and shares evenly. A branch running <b>into</b> the line is a <b>merge</b>. <span class="tag t-player">Player</span></figcaption>
+      <figcaption>Every plain belt split shares evenly, whatever its shape: straight + side, or a T. The direction of the branch decides what it is: running <b>out</b> of the line it is a split, running <b>into</b> the line a <b>merge</b>. Only the Priority Splitter prefers an output (next diagram). <span class="tag t-player">Player</span></figcaption>
     </figure>
     <figure class="card">
       <svg viewBox="0 0 340 210" role="img" aria-label="Priority splitter">
@@ -283,7 +283,7 @@
         <text x="215" y="150" font-size="12" class="good">lower: module first</text>
         <text x="215" y="80" font-size="12" class="muted">upper: overflow → export</text>
       </svg>
-      <figcaption>Priority Splitter (2×1×2): the lower output gets everything until it backs up. Used so the module's own needs come before export. <span class="tag t-bp">Blueprint</span></figcaption>
+      <figcaption>Priority Splitter (2×1×2): the lower output gets <b>everything first</b>; the upper only gets items once the lower backs up. This is the "straight first" rule. Used so the module's own needs come before export. <span class="tag t-player">Player</span> <span class="tag t-bp">Blueprint</span></figcaption>
     </figure>
     <figure class="card">
       <svg viewBox="0 0 340 210" role="img" aria-label="Starter box at the module outline">
@@ -357,7 +357,8 @@
   <h2 id="unknown">12. What we don't know yet</h2>
   <div class="card unknown">
     <ul>
-      <li><span class="prio">High</span><b>3-way belt split</b>: does straight win over both sides, and how do the sides share?</li>
+      <li><span class="prio">High</span><b>Cauldron line filling from the end</b>: one line once filled its last cauldron first. With even splits the cause is unknown (perhaps how machines take items from a passing belt).</li>
+      <li><span class="prio">Low</span><b>3-way belt split</b>: assumed to share evenly like the 2-way one.</li>
       <li><span class="prio">High</span><b>Merges</b> (plain belt merge, Priority Merger): which input goes first, and is it fair?</li>
       <li><span class="prio">High</span><b>Machine input buffers</b>: how many items a nursery or cauldron holds; decides how big the starter box fill must be.</li>
       <li><span class="prio">Medium</span><b>Purchasing Portal speed</b>: assumed one belt.</li>

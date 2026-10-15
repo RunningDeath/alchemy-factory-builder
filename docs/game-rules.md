@@ -47,7 +47,7 @@ The human-readable version with diagrams is `docs/game-rules.html`. Open questio
   - The module's own nurseries get **full priority**; only leftovers leave. **[Player]**
   - A **reserve** (default 25 %) is planned on top. What isn't eaten leaves as product, so the delivered amount can exceed the target. **[Player]**
   - If one producer covers all nurseries, it feeds all of them and the others export; otherwise each producer used feeds every nursery. Producers feeding *different* nurseries deadlock: the starter box reaches only some plants, and the potion needs all of them. **[Player]** (Redcurrant case)
-  - Fertilizer to several consumers splits **evenly** (T-splits), so each plant type starts at once and the loop needs few starting items. **[Player]**
+  - Fertilizer to several consumers must reach every plant type at once, so the loop needs few starting items. Plain belt splits share evenly, so this holds as long as no Priority Splitter sits between the nursery groups. **[Player]**
 - **Grind at the nursery:** when a nursery's whole output goes into one grinder, the grinder sits right at the output port (a machine pair). **[Player]**
 
 ## 4. Heat
@@ -117,10 +117,9 @@ The human-readable version with diagrams is `docs/game-rules.html`. Open questio
 ## 7. Logistics
 
 - **Plain belts:** player blueprints only use the plain belt for straight runs, turns, splits and merges. `BaseActiveIndex` holds the connected sides relative to the front (front 1, right 2, back 4, left 8; outputs shifted by 4). **[Blueprint]** (429 belts in 18 blueprints)
-- **Belt splits go straight first:** a split with a straight-on output sends everything straight; the side gets items only when straight backs up. Along a feed line the **end fills first** (the last cauldron filled completely before the others). **[Player]**
-- **T-split:** in from the side, out both ways, no straight output. It splits **evenly**. **[Player]**
+- **Plain belt splits share evenly, whatever the shape:** straight + side, or left + right (a T). **[Player]** (an earlier note said "straight first"; that applies only to the Priority Splitter)
 - **Merge:** the same belt shape with the branch running **into** the line is a merge (two belts in, one out), not a split. What decides split versus merge is the direction of the branch. **[Player]**
-- **Priority Splitter (vertical, 2×1×2):** in on one side, two outputs on the other, lower first. The lower output gets everything until it backs up; used for "module first, overflow to export". **[Blueprint]**/**[Data]**
+- **Priority Splitter (vertical, 2×1×2):** in on one side, two outputs on the other. The lower output gets **everything first**; the upper only gets items when the lower backs up. Used for "module first, overflow to export". **[Player]**/**[Blueprint]**
 - **Filter Splitter:**
   - Tall version: the filtered item takes the **lower** output.
   - Flat version: the filtered item takes the **side** output, the rest runs straight.
@@ -171,24 +170,25 @@ The human-readable version with diagrams is `docs/game-rules.html`. Open questio
 
 What we don't know or haven't verified, roughly by how much it matters:
 
-1. **3-way belt split** (in + three outputs): does the straight output take priority over both sides, and how do the two sides share? Assumed to behave like the 2-way split.
-2. **Plain belt merges and the Priority Merger:** which input goes first, and does a merge alternate fairly? Unknown; matters for back flows that join a main line.
-3. **Machine input buffers:** how many items a machine (nursery, cauldron) holds before its input backs up. This decides how much a starter box must hold and how fast a line fills.
-4. **Purchasing Portal speed:** assumed one belt per portal; the data has no rate.
-5. **Heater burn with research:** we assume a heater's own burn doesn't speed up with Factory Efficiency (as starfi5h does). The old planner scaled it, a 5–9 % fuel difference.
-6. **Lifts:** maximum height, throughput, whether a lift can take or give items at intermediate levels (assumed no), and why stacked cauldrons can't share one lift ("can't transport multiple stages").
-7. **Stone Furnace** (42 slots, 4 heat/s): never placed by the generator; how it's built and fed is unclear.
-8. **Steam Heating Pads:** exact rules for which pads are heated through neighbours versus need their own pipe.
-9. **Pipes:** no known throughput or length limit (treated as unlimited); not verified for very long runs or large brine rates.
-10. **Thermal Extractor:** starfi5h models output growing with build height (×1 at height 0 to ×3 at 255); not modelled here.
-11. **Advanced Athanor catalysts** (Unstable, Fertile, Resonant, Eternal): change outputs or use charges; not modelled.
-12. **Machines the generator hasn't been taught or checked:**
+1. **3-way belt split** (in + three outputs): assumed to share evenly like the 2-way split, not verified.
+2. **Cauldron line filling from the end:** one cauldron line once filled its last cauldron completely before the others. With even splits, the cause is unknown (perhaps how machines take items from a belt running past them).
+3. **Plain belt merges and the Priority Merger:** which input goes first, and does a merge alternate fairly? Unknown; matters for back flows that join a main line.
+4. **Machine input buffers:** how many items a machine (nursery, cauldron) holds before its input backs up. This decides how much a starter box must hold and how fast a line fills.
+5. **Purchasing Portal speed:** assumed one belt per portal; the data has no rate.
+6. **Heater burn with research:** we assume a heater's own burn doesn't speed up with Factory Efficiency (as starfi5h does). The old planner scaled it, a 5–9 % fuel difference.
+7. **Lifts:** maximum height, throughput, whether a lift can take or give items at intermediate levels (assumed no), and why stacked cauldrons can't share one lift ("can't transport multiple stages").
+8. **Stone Furnace** (42 slots, 4 heat/s): never placed by the generator; how it's built and fed is unclear.
+9. **Steam Heating Pads:** exact rules for which pads are heated through neighbours versus need their own pipe.
+10. **Pipes:** no known throughput or length limit (treated as unlimited); not verified for very long runs or large brine rates.
+11. **Thermal Extractor:** starfi5h models output growing with build height (×1 at height 0 to ×3 at 255); not modelled here.
+12. **Advanced Athanor catalysts** (Unstable, Fertile, Resonant, Eternal): change outputs or use charges; not modelled.
+13. **Machines the generator hasn't been taught or checked:**
     - Shaper and Advanced Shaper (front output);
     - Aether Shaper, Arcane Processor (raised output), Omni Machine;
     - Refiner layouts with many outputs;
     - Paradox Crucible in modules.
-13. **Catapults** (Throwing Efficiency): not used; their range and throughput are unknown to us.
-14. **Coins on belts:** starfi5h lets coins pass 50× a belt's speed; we keep money on one line and don't cap it. Unclear in game.
-15. **Seed counts:** seeds a nursery needs are taken from the recipe; unverified.
-16. **Game data freshness:** items and recipes come from an external export and may lag behind game updates. Footprints and unlocks come from our own extractor; re-run both after a patch.
-17. **Balanced Splitter:** present but hidden; if a future patch enables it, even splits get easier.
+14. **Catapults** (Throwing Efficiency): not used; their range and throughput are unknown to us.
+15. **Coins on belts:** starfi5h lets coins pass 50× a belt's speed; we keep money on one line and don't cap it. Unclear in game.
+16. **Seed counts:** seeds a nursery needs are taken from the recipe; unverified.
+17. **Game data freshness:** items and recipes come from an external export and may lag behind game updates. Footprints and unlocks come from our own extractor; re-run both after a patch.
+18. **Balanced Splitter:** present but hidden; if a future patch enables it, even splits get easier.

@@ -133,7 +133,6 @@ targets, research, settings
    - Imports join one import per item while it has room; money always on one line.
 5. **Commit:** builds the pieces. Branching turns a belt into a split, merging into a merge.
 6. **Passes:** up to 6 (PR #4). Failed connections go first in the next pass, the rest in a deterministically shuffled order. Paths through themselves are retried while avoiding the doubled cell (up to 3 times). Failures carry a reason: `no-start`, `no-way`, `search-limit` or `commit`.
-7. **Pending, not committed:** branching that leaves a straight-on output costs +6 (+40 for primed items), so branches become **T-splits** that share evenly. This is being benchmarked now.
 
 ## 8. Finish: `routeAndFinish`
 
