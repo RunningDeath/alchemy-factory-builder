@@ -247,21 +247,32 @@
 
   <h2 id="belts">7. Belts, splits and the starter box</h2>
   <div class="grid">
-    <figure class="card">
-      <svg viewBox="0 0 340 210" role="img" aria-label="Straight-first split versus T split">
-        <text x="10" y="18" font-weight="700" font-size="14">Straight first</text>
-        <path class="belt" d="M20 70 H150"/><path class="belt" d="M85 70 V130"/>
-        <polygon class="arrow" points="142,64 154,70 142,76"/>
-        <text x="155" y="74" font-size="12" class="good">all of it</text>
-        <text x="60" y="150" font-size="12" class="bad">only overflow</text>
-        <line x1="170" y1="30" x2="170" y2="200" class="grid"/>
-        <text x="185" y="18" font-weight="700" font-size="14">T-split</text>
-        <path class="belt" d="M255 150 V90"/><path class="belt" d="M200 90 H310"/>
-        <polygon class="arrow" points="208,84 196,90 208,96"/><polygon class="arrow" points="302,84 314,90 302,96"/>
-        <text x="188" y="120" font-size="12" class="good">½</text><text x="300" y="120" font-size="12" class="good">½</text>
-        <text x="262" y="175" font-size="11" class="muted">in from the side</text>
+    <figure class="card" style="grid-column: 1 / -1">
+      <svg viewBox="0 0 720 240" role="img" aria-label="Split with a straight output, T-split and merge, with the direction of every belt">
+        <text x="10" y="20" font-weight="700" font-size="14">Split with a straight output</text>
+        <path class="belt" d="M20 90 H210"/><path class="belt" d="M110 90 V175"/>
+        <polygon class="arrow" points="46,84 58,90 46,96"/><polygon class="arrow" points="196,84 208,90 196,96"/><polygon class="arrow" points="104,161 110,173 116,161"/>
+        <text x="20" y="74" font-size="12" class="muted">in</text>
+        <text x="150" y="74" font-size="12" class="good">straight: everything</text>
+        <text x="120" y="140" font-size="12" class="bad">side: only when</text>
+        <text x="120" y="156" font-size="12" class="bad">straight backs up</text>
+        <line x1="240" y1="30" x2="240" y2="225" class="grid"/>
+        <text x="255" y="20" font-weight="700" font-size="14">T-split (no straight output)</text>
+        <path class="belt" d="M360 190 V90"/><path class="belt" d="M260 90 H460"/>
+        <polygon class="arrow" points="354,154 360,142 366,154"/><polygon class="arrow" points="274,84 262,90 274,96"/><polygon class="arrow" points="446,84 458,90 446,96"/>
+        <text x="370" y="185" font-size="12" class="muted">in from below</text>
+        <text x="280" y="74" font-size="13" class="good">½</text><text x="425" y="74" font-size="13" class="good">½</text>
+        <text x="300" y="225" font-size="12" class="good">both sides at once</text>
+        <line x1="480" y1="30" x2="480" y2="225" class="grid"/>
+        <text x="495" y="20" font-weight="700" font-size="14">Merge (not a split)</text>
+        <path class="belt" d="M500 90 H705"/><path class="belt" d="M600 190 V90"/>
+        <polygon class="arrow" points="531,84 543,90 531,96"/><polygon class="arrow" points="691,84 703,90 691,96"/><polygon class="arrow" points="594,149 600,137 606,149"/>
+        <text x="500" y="74" font-size="12" class="muted">in</text>
+        <text x="610" y="185" font-size="12" class="muted">in from below</text>
+        <text x="640" y="74" font-size="12">out</text>
+        <text x="500" y="225" font-size="12" class="muted">two belts join, one leaves</text>
       </svg>
-      <figcaption>A belt split with a straight-on output feeds straight first; along a line the <b>end</b> fills first. A T (no straight output) splits evenly. <span class="tag t-player">Player</span></figcaption>
+      <figcaption>The same belt shape is a split or a merge depending on which way the branch runs. A <b>split with a straight output</b> sends everything straight on; the side branch only gets items once the straight path backs up, so along a feed line the <b>end</b> fills first. A <b>T-split</b> has no straight output (the belt comes in from the side and leaves both ways) and shares evenly. A branch running <b>into</b> the line is a <b>merge</b>. <span class="tag t-player">Player</span></figcaption>
     </figure>
     <figure class="card">
       <svg viewBox="0 0 340 210" role="img" aria-label="Priority splitter">

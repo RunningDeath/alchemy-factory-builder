@@ -119,6 +119,7 @@ The human-readable version with diagrams is `docs/game-rules.html`. Open questio
 - **Plain belts:** player blueprints only use the plain belt for straight runs, turns, splits and merges. `BaseActiveIndex` holds the connected sides relative to the front (front 1, right 2, back 4, left 8; outputs shifted by 4). **[Blueprint]** (429 belts in 18 blueprints)
 - **Belt splits go straight first:** a split with a straight-on output sends everything straight; the side gets items only when straight backs up. Along a feed line the **end fills first** (the last cauldron filled completely before the others). **[Player]**
 - **T-split:** in from the side, out both ways, no straight output. It splits **evenly**. **[Player]**
+- **Merge:** the same belt shape with the branch running **into** the line is a merge (two belts in, one out), not a split. What decides split versus merge is the direction of the branch. **[Player]**
 - **Priority Splitter (vertical, 2×1×2):** in on one side, two outputs on the other, lower first. The lower output gets everything until it backs up; used for "module first, overflow to export". **[Blueprint]**/**[Data]**
 - **Filter Splitter:**
   - Tall version: the filtered item takes the **lower** output.
