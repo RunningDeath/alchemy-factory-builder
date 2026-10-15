@@ -545,6 +545,7 @@ function buildTier(
     const laneItems = (flows: StepFlow[], machineCount: number) => flows.map((fl) => ({ itemName: fl.itemName, rate: fl.perMachineRate * machineCount }));
     const inputLanes: InputLane[] = [];
     const offLaneOuts: ReturnType<typeof placementPorts> = [];
+    const offLaneIns: ReturnType<typeof placementPorts> = [];
 
     for (let level = 0; level < levelsUsed; level++) {
         const z = levelZ(level);
@@ -560,8 +561,10 @@ function buildTier(
             for (const port of ports) {
                 if (port.z !== z || port.face === "up" || port.face === "down" || port.face === "top" || port.face === "base") {
                     // Outputs off the lanes (raised, or out the front or back) get a belt stub of
-                    // their own below; inputs there just stay unused (another port takes the items)
+                    // their own below; inputs there stay unused while another port takes the items,
+                    // else they get a stub too (an iron smelter takes its ore only at the top)
                     if (port.dir === "out") offLaneOuts.push(port);
+                    else if (inPorts.length === 0) offLaneIns.push(port);
                     continue;
                 }
                 const laneSide = oppositeSide(port.face);
@@ -698,7 +701,7 @@ function buildTier(
     // A straight belt in front of each output off the lanes, its end open for the router;
     // inside the block's outline only (outside it neighbours would collide)
     const taken = buildOccupancy([...placements, ...lifts, ...belts]);
-    for (const port of offLaneOuts) {
+    for (const port of [...offLaneOuts, ...offLaneIns]) {
         const face = port.face as Side;
         if (!SIDE_OFFSET[face]) {
             offLanePorts++;
@@ -714,10 +717,13 @@ function buildTier(
             offLanePorts++;
             continue;
         }
-        const piece = beltPieceFor([oppositeSide(face)], [face])!;
+        const input = port.dir === "in";
+        // Out of an output, away from the machine; into an input, toward it
+        const piece = (input ? beltPieceFor([face], [oppositeSide(face)]) : beltPieceFor([oppositeSide(face)], [face]))!;
+        const flows = input ? step.inputs : step.outputs;
         const stub: Placement = {
-            uid: nextUid("b"), id: piece.id, ...cell, rot: piece.rot, nodeKey: step.nodeKey, lane: "out", label: step.outputs.map((o) => o.itemName).join(" + "),
-            laneEnd: { kind: "out", items: laneItems(step.outputs, 1) },
+            uid: nextUid("b"), id: piece.id, ...cell, rot: piece.rot, nodeKey: step.nodeKey, lane: input ? "in" : "out", label: flows.map((o) => o.itemName).join(" + "),
+            laneEnd: { kind: input ? "in" : "out", items: laneItems(flows, 1) },
         };
         addToOccupancy(taken, stub);
         belts.push(stub);

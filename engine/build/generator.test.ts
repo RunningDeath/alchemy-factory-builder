@@ -250,6 +250,26 @@ describe("separate inputs, filters and heating", () => {
     expect(mod.placements.some((p) => p.id === "stone-stove")).toBe(false);
   });
 
+  test("a raised input that is the machine's only one gets a belt: iron smelters take ore at the top", () => {
+    // Before, raised inputs were skipped (another port takes the items): the smelters' only input
+    // stayed open and the purchasing portal's ore left at the edge
+    const mod = generateModule(
+      [
+        step({
+          deviceId: "iron-smelter",
+          machines: 4,
+          inputs: [{ itemName: "Iron Ore", perMachineRate: 0.27 }],
+          outputs: [{ itemName: "Iron Ingot", perMachineRate: 27 }],
+          heating: { kind: "steam", fuelItem: "Steam", fuelRate: 30 },
+        }),
+      ],
+      options,
+    );
+    expect(validateLayout(mod.placements)).toEqual([]);
+    expect(unconnectedMachinePorts(mod)).toEqual([]);
+    expect(mod.routes.filter((r) => r.itemName === "Iron Ore" && r.to.includes("export"))).toEqual([]);
+  });
+
   test("steam heating: two-input machines on the platform get supported stub lifts and fed heaters", () => {
     // Athanors stand one level up on their heaters; the lifts down into their second input need support
     for (const machines of [2, 4, 6]) {

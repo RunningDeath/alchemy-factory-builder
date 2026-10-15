@@ -8,6 +8,7 @@ import { stepsFromReport } from "../../engine/build/module-steps";
 import { suggestModuleGroups } from "../../engine/build/module-groups";
 import { lockedBuildings } from "../../engine/build/unlocks";
 import type { BuildLayoutState } from "../../engine/types";
+import { getItem } from "../../engine/item-utils";
 import { BELT_COLORS, buildingName, carriedItem, itemColorMap } from "../../lib/buildCatalog";
 import { ExportBlueprintDialog } from "./ExportBlueprintDialog";
 import { GenerateProgress } from "./GenerateProgress";
@@ -184,7 +185,10 @@ export function BuildPlanner() {
         // Module groups only count while "Build as modules" is on
         const config = factory?.config;
         // (unset means made in the factory, as in the planner)
-        const boughtItems = [config?.selfFertilizer === false ? config.selectedFertilizer : undefined, config?.selfFuel === false ? config.selectedFuel : undefined].filter((i): i is string => !!i);
+        // The config keeps item ids ("growthpotion"), the generator compares display names
+        const boughtItems = [config?.selfFertilizer === false ? config.selectedFertilizer : undefined, config?.selfFuel === false ? config.selectedFuel : undefined]
+            .filter((i): i is string => !!i)
+            .map((i) => getItem(i)?.name ?? i);
         const request: GenerateRequest = {
             steps,
             options: { ...opts, moduleGroups: opts.modules ? opts.moduleGroups : undefined, beltSpeed: report.beltSpeed, finalProducts: report.targets.map((t) => t.itemName), unlocks, boughtItems },
