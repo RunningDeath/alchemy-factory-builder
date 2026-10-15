@@ -35,6 +35,9 @@ if (args.Length == 3 && args[0] == "strings")
 
 var iconsMode = args.Length > 0 && args[0] == "icons";
 if (iconsMode) args = args[1..];
+// Every data table, one JSON file each: dotnet run -- tables <paks dir> <mappings.usmap> <out dir>
+var tablesMode = args.Length > 0 && args[0] == "tables";
+if (tablesMode) args = args[1..];
 if (args.Length < 3)
 {
     Console.Error.WriteLine("Usage: dotnet run -- <paks dir> <mappings.usmap> <out.json>");
@@ -58,6 +61,28 @@ var provider = new DefaultFileProvider(paksDir, SearchOption.TopDirectoryOnly, n
 };
 provider.Initialize();
 provider.Mount();
+
+if (tablesMode)
+{
+    Directory.CreateDirectory(outPath);
+    var tables = provider.Files.Keys.Where((k) => k.Contains("/DataTables/", StringComparison.OrdinalIgnoreCase) && k.EndsWith(".uasset", StringComparison.OrdinalIgnoreCase)).OrderBy((k) => k).ToList();
+    foreach (var file in tables)
+    {
+        var name = Path.GetFileNameWithoutExtension(file);
+        try
+        {
+            var table = provider.LoadPackageObject<UDataTable>($"{file[..^".uasset".Length]}.{name}");
+            var map = table.RowMap.ToDictionary((kv) => kv.Key.Text, (kv) => kv.Value);
+            File.WriteAllText(Path.Combine(outPath, $"{name}.json"), JsonConvert.SerializeObject(map, Formatting.Indented));
+            Console.WriteLine($"{file}: {map.Count} rows");
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine($"{file}: not a data table ({e.GetType().Name})");
+        }
+    }
+    return 0;
+}
 
 Dictionary<string, CUE4Parse.UE4.Assets.Objects.FStructFallback> Rows(string name) =>
     provider.LoadPackageObject<UDataTable>($"AlchemyFactory/Content/DataTables/{name}.{name}").RowMap.ToDictionary(kv => kv.Key.Text, kv => kv.Value);

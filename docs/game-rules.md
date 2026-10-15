@@ -8,6 +8,8 @@ Reference for agents working on the planner (`engine/planner`) and the module ge
 | **[Blueprint]** | Read from real player blueprints (`engine/build/blueprint/fixtures`, 18 blueprints for belts) |
 | **[Data]** | Game files: `data/*.json` (items, recipes, devices from the AlchemyFactoryData export; footprints and unlocks from our own extractor `tools/extract-game-data`) |
 | **[Calc]** | Community calculators (starfi5h/AlchemyFactoryCalculator, the cauldron tools): mechanics only, no code copied |
+| **[Game]** | The game's own data tables (game version 5.7.4, read 2026-10-15 with `tools/extract-game-data tables` and a mappings file) |
+| **[Text]** | The game's own English texts (building descriptions, manuals) |
 | **[Assumed]** | Our own assumption, not verified in game |
 
 The human-readable version with diagrams is `docs/game-rules.html`. Open questions are at the end ("Unknown or unsure").
@@ -16,10 +18,10 @@ The human-readable version with diagrams is `docs/game-rules.html`. Open questio
 
 ## 1. Research and rates
 
-- **Machine speed (Factory Efficiency):** ×(1 + 0.25·level) up to level 12, then +0.05 per level (cap 92). `engine/game-constants.ts` **[Calc]**
-- **Belt speed (Logistics Efficiency):** 60/min + 15 per level up to 12, then +3 per level. Level 7 = 165/min. **[Calc]**
-- **Alchemy Skill:** extra output on Extractor, Thermal Extractor, Alembic and Advanced Alembic only: +6 % for levels 1–2, +8 % for 3–8, +10 % after. **[Calc]**
-- **Fuel Efficiency:** +10 % heat per fuel item per level. **[Calc]**
+- **Machine speed (Factory Efficiency):** ×(1 + 0.25·level) up to level 12, then +0.05 per level. Heat consumption (`FactoryConsumeSpeed`) grows the same way. `engine/game-constants.ts` **[Game]**
+- **Belt speed (Logistics Efficiency):** 60/min + 15 per level up to 12, then +3 per level. Level 7 = 165/min. Conveyor lifts get the same speed. **[Game]**
+- **Alchemy Skill:** extra output on Extractor, Thermal Extractor, Alembic and Advanced Alembic only (game attributes `ExtractorSkill`, `AlembicSkill`): +6 % for levels 1–2, +8 % for 3–8, +10 % after. **[Game]**
+- **Fuel Efficiency:** +10 % heat per fuel item per level. **[Game]**
 - **Fertilizer Efficiency:** +10 % nutrients per fertilizer item per level. It does **not** make nurseries grow faster. **[Player]** (checked: a Growth Potion lasts 6480 × 1.1 / 1980 = 3.6 s in a belt-capped nursery; "my nutrient bonus is on 1")
 - Throwing, Sales, Customer Management, Negotiation and Relic Knowledge are shown but not used by the planner. **[Calc]**
 
@@ -173,6 +175,7 @@ Sources here: **[Player]** answers (Oct 2026) and **[Text]**, the game's own Eng
 
 | Point | What we know now | Source |
 |---|---|---|
+| Game data | Compared on 2026-10-15 with the game's own tables (version 5.7.4): all 180 items and 161 recipes in `data/` match. Two notations differ, the rates don't: **bulk items** (negative `MaximumStack`, e.g. Logs −200) store heat per portion (Logs 10 × 200 = our 2000), and **`FractionNum`** says how many crafts one input lasts (1 Log → 200 Planks at 2 s each = our 200 per 400 s). | [Game] |
 | Starter box size | One small storage box is enough to start a self-fertilizing (or self-fueled) loop. | [Player] |
 | Purchasing Portal speed | Not calculated; how fast to buy is the player's choice. A portal delivers raw materials up to one belt's speed. It takes any coin and exchanges automatically. | [Player], [Text] |
 | Lifts | Any height. Exactly one input at the bottom end and one output at the top end (or the reverse when switched to downwards), nothing in between. That's why stacked machines can't share one lift. | [Player], [Text] |
@@ -200,5 +203,4 @@ Sources here: **[Player]** answers (Oct 2026) and **[Text]**, the game's own Eng
 2. **Coins on belts:** can one coin line carry everything, or are coins limited like items? (starfi5h assumes 50× a belt.)
 3. **Seed counts:** seeds a nursery needs are taken from the recipe; unverified.
 4. **Untaught machine layouts:** Shaper, Advanced Shaper and Aether Shaper (front output), Arcane Processor (raised output, Arcane Fountain input), Omni Machine, Paradox Crucible in modules.
-5. **Game data freshness:** reading the game's tables (recipes, items, building data) directly needs a mappings file (`.usmap`, made with UE4SS, see `tools/extract-game-data/README.md`). Only the texts can be read without one.
-6. **3-way belt split:** assumed to share evenly like the 2-way split.
+5. **3-way belt split:** assumed to share evenly like the 2-way split.

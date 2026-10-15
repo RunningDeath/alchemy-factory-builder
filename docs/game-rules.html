@@ -81,10 +81,10 @@
   <div class="table-wrap card">
     <table>
       <tr><th>Research</th><th>Effect</th><th>Source</th></tr>
-      <tr><td>Factory Efficiency</td><td>Machine speed ×(1 + 0.25 per level) up to 12, then +0.05 per level. Level 7 = +175 %.</td><td><span class="tag t-calc">Calc</span></td></tr>
-      <tr><td>Logistics Efficiency</td><td>Belt speed 60/min + 15 per level up to 12, then +3. Level 7 = 165/min.</td><td><span class="tag t-calc">Calc</span></td></tr>
-      <tr><td>Alchemy Skill</td><td>Extra output on Extractor, Thermal Extractor, Alembic, Advanced Alembic: +6 % (levels 1–2), +8 % (3–8), +10 % after.</td><td><span class="tag t-calc">Calc</span></td></tr>
-      <tr><td>Fuel Efficiency</td><td>+10 % heat per fuel item per level.</td><td><span class="tag t-calc">Calc</span></td></tr>
+      <tr><td>Factory Efficiency</td><td>Machine speed ×(1 + 0.25 per level) up to 12, then +0.05 per level. Level 7 = +175 %. Heat use grows the same way.</td><td><span class="tag t-data">Game</span></td></tr>
+      <tr><td>Logistics Efficiency</td><td>Belt speed 60/min + 15 per level up to 12, then +3. Level 7 = 165/min. Lifts the same.</td><td><span class="tag t-data">Game</span></td></tr>
+      <tr><td>Alchemy Skill</td><td>Extra output on Extractor, Thermal Extractor, Alembic, Advanced Alembic: +6 % (levels 1–2), +8 % (3–8), +10 % after.</td><td><span class="tag t-data">Game</span></td></tr>
+      <tr><td>Fuel Efficiency</td><td>+10 % heat per fuel item per level.</td><td><span class="tag t-data">Game</span></td></tr>
       <tr><td>Fertilizer Efficiency</td><td>+10 % nutrients per fertilizer item per level. <b>Not</b> faster growth: a Growth Potion lasts 6480 × 1.1 / 1980 = 3.6 s.</td><td><span class="tag t-player">Player</span></td></tr>
     </table>
   </div>
@@ -359,6 +359,7 @@
   <div class="table-wrap card">
     <table>
       <tr><th>Point</th><th>What we know now</th><th>Source</th></tr>
+      <tr><td>Game data</td><td>All 180 items and 161 recipes match the game (version 5.7.4), checked against its own tables.</td><td><span class="tag t-data">Game</span></td></tr>
       <tr><td>Starter box</td><td>One small storage box is enough to start the loop.</td><td><span class="tag t-player">Player</span></td></tr>
       <tr><td>Purchasing Portal</td><td>Speed not calculated (your choice); up to one belt of raw materials. Takes any coin.</td><td><span class="tag t-player">Player</span></td></tr>
       <tr><td>Lifts</td><td>Any height; one input and one output at the two ends, nothing in between.</td><td><span class="tag t-player">Player</span></td></tr>
@@ -381,7 +382,6 @@
     <ul>
       <li><span class="prio">Medium</span><b>Untaught machines</b>: Shaper family (front output), Arcane Processor, Omni Machine, Paradox Crucible in modules.</li>
       <li><span class="prio">Low</span><b>Thermal Extractor height formula</b>, <b>coins on belts</b>, <b>seed counts</b>, <b>3-way split</b>: unverified.</li>
-      <li><span class="prio">Low</span><b>Game data</b>: the game's tables need a mappings file (<code>.usmap</code>) to read; texts don't.</li>
     </ul>
   </div>
   <p class="lead" style="font-size:.85rem">Agent version: <code>docs/game-rules.md</code>.</p>

@@ -51,3 +51,13 @@ dotnet run -c Release -- strings "<Steam>/steamapps/common/Alchemy Factory/Alche
 ```
 
 Useful for checking how buildings behave (docs/game-rules.md cites them as [Text]).
+
+## All data tables
+
+With a mappings file, every data table can be dumped as JSON (one file per table):
+
+```bash
+dotnet run -c Release -- tables "<Steam>/steamapps/common/Alchemy Factory/AlchemyFactory/Content/Paks" path/to/mappings.usmap path/to/out-dir
+```
+
+The useful ones: `DT_Enemies` (items, despite the name), `DT_EnemyCrafting` (recipes; `CraftType` names the machine, `FractionNum` says how many crafts one input lasts), `DT_PlantSeedConfig` (growth), `DT_Improvements` and `DT_Attributes` (research effects), `DT_Buildings`. Keep the mappings file outside the repo (it is made from the game).
