@@ -8,7 +8,8 @@ import { entryId, getDevice, getItem, getRecipeById, isSeedInput } from "../item
 import type { EfficiencyContext } from "./context";
 import { primaryOutput, recipeFlows, type RecipeFlows } from "./recipes";
 
-const EPSILON = 1e-6;
+/** Noise is dropped where the program is solved (see SOLVE_SCALE); this only skips zeros */
+const EPSILON = 1e-9;
 
 export interface Solved {
     crafts: Map<string, number>;
@@ -85,24 +86,39 @@ export function buildGraph(solved: Solved, targets: Map<string, number>, ctx: Ef
         addSource(key, node, rate);
     }
 
+    /** Per source node: what consumers take of each item (a node may hand out its byproducts too) */
+    const takenOf = new Map<string, Map<string, number>>();
+    // What a craft uses of each item: inputs and the fuel or fertilizer burnt (an output used
+    // up in the same machine nets out)
+    const usesOf = (f: RecipeFlows) => [...f.net].filter(([key, value]) => value < 0 && -value + (f.outputs.get(key) ?? 0) > EPSILON);
+    const usage = new Map<string, number>();
+    for (const { crafts, f } of active) for (const [key, value] of usesOf(f)) usage.set(key, (usage.get(key) ?? 0) + -value * crafts);
+    const isMaker = (s: { node: ProductionNode }, key: string) => !s.node.isRaw && s.node.itemName === nameOf(key);
     // Link each consumer to the sources of what it uses
     for (const { crafts, f } of active) {
         const node = nodes.get(recipeNodeId(primaryOutput(f.recipe), f.recipe.id))!;
         const link = (key: string, rate: number) => {
             const list = (sources.get(key) ?? []).filter((s) => s.node !== node);
-            const total = list.reduce((sum, s) => sum + s.rate, 0);
-            for (const s of list) {
-                const share = total > 0 ? (rate * s.rate) / total : 0;
+            // A target is drawn from its other sources first (byproducts, supply): its own
+            // makers keep the product, the rest would have nowhere to go
+            const others = targets.has(key) ? list.filter((s) => !isMaker(s, key)) : list;
+            const mains = targets.has(key) ? list.filter((s) => isMaker(s, key)) : [];
+            const sum = (group: typeof list) => group.reduce((t, s) => t + s.rate, 0);
+            const fromOthers = !mains.length ? rate : !others.length ? 0 : rate * Math.min(1, sum(others) / (usage.get(key) ?? rate));
+            const shares = [
+                ...others.map((s) => ({ s, part: (fromOthers * s.rate) / sum(others) })),
+                ...mains.map((s) => ({ s, part: ((rate - fromOthers) * s.rate) / sum(mains) })),
+            ];
+            for (const { s, part: share } of shares) {
                 if (share < EPSILON) continue;
+                const taken = takenOf.get(s.node.id!) ?? new Map<string, number>();
+                taken.set(key, (taken.get(key) ?? 0) + share);
+                takenOf.set(s.node.id!, taken);
                 if (!node.inputs.includes(s.node)) node.inputs.push(s.node);
                 node.inputRates = { ...node.inputRates, [s.node.id!]: (node.inputRates?.[s.node.id!] ?? 0) + share };
             }
         };
-        for (const [key, value] of f.net) {
-            // Inputs and the fuel or fertilizer burnt (an output used up in the same machine nets out)
-            const usedHere = -value + (f.outputs.get(key) ?? 0);
-            if (usedHere > EPSILON && value < 0) link(key, -value * crafts);
-        }
+        for (const [key, value] of usesOf(f)) link(key, -value * crafts);
         // Seeds sit in the nursery for good: shown as raw inputs, nothing flows
         for (const i of f.recipe.inputs) {
             if (!isSeedInput(f.recipe, i)) continue;
@@ -116,17 +132,28 @@ export function buildGraph(solved: Solved, targets: Map<string, number>, ctx: Ef
     // Roots: the nodes making each target, with what is left of it after the factory's own use
     const roots: ProductionNode[] = [];
     for (const item of targets.keys()) {
-        const makers = (sources.get(item) ?? []).filter((s) => !s.node.isRaw && s.node.itemName === nameOf(item));
-        const made = makers.reduce((sum, s) => sum + s.rate, 0);
-        const ids = new Set(makers.map((m) => m.node.id!));
-        const usedInside = [...nodes.values()].reduce((sum, n) => sum + Object.entries(n.inputRates ?? {}).reduce((s, [id, r]) => s + (ids.has(id) ? r : 0), 0), 0);
+        const makers = (sources.get(item) ?? []).filter((s) => isMaker(s, item));
+        // Only the target item counts: consumers may take a maker's byproduct too (sand from salt)
+        const left = (n: ProductionNode, rate: number) => rate - (takenOf.get(n.id!)?.get(item) ?? 0);
+        let net = 0;
         for (const { node, rate } of makers) {
             node.isTarget = true;
-            node.netOutputRate = (rate / made) * (made - usedInside);
+            node.netOutputRate = left(node, rate);
+            net += node.netOutputRate;
             roots.push(node);
         }
-        // A target nobody makes (supplied or bought outright) still shows up
-        if (!makers.length && nodes.has(rawNodeId(item))) roots.push(nodes.get(rawNodeId(item))!);
+        // Supply makes up what the makers can't (their own recipes couldn't make it all); a
+        // target nobody makes (supplied or bought outright) still shows up
+        const raw = nodes.get(rawNodeId(item));
+        const rawLeft = raw ? left(raw, (sources.get(item) ?? []).filter((s) => s.node === raw).reduce((sum, s) => sum + s.rate, 0)) : 0;
+        const missing = (targets.get(item) ?? 0) - net;
+        if (raw && (!makers.length || (missing > EPSILON && rawLeft > EPSILON))) {
+            if (makers.length) {
+                raw.isTarget = true;
+                raw.netOutputRate = Math.min(rawLeft, missing);
+            }
+            roots.push(raw);
+        }
     }
     return roots;
 }

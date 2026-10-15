@@ -147,11 +147,12 @@ export function simulateFlow(nodes: FlowNode[], edges: FlowEdge[], targets: Flow
     const edgeActual = new Map<string, number>();
     edges.forEach((e) => edgeActual.set(e.key, draw(e)));
 
-    // Raw supply shows what was actually drawn
+    // Raw supply shows what was actually drawn, by consumers and by targets taken straight from it
     nodes.forEach((n) => {
         if (!n.isRaw) return;
         const drawn = edges.filter((e) => e.source === n.key).reduce((sum, e) => sum + (edgeActual.get(e.key) || 0), 0);
-        realized.set(n.key, drawn);
+        const asked = targets.filter((t) => t.source === n.key).reduce((sum, t) => sum + t.demand, 0);
+        realized.set(n.key, drawn + asked);
     });
 
     // Targets receive whatever the producer makes beyond what other nodes draw

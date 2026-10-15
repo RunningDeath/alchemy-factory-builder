@@ -15,7 +15,7 @@ import type { PlannerConfig, Recipe } from "../types";
 import { PLANT_BASED } from "../cauldron";
 import { getDevice, getItem, normalizeItemId } from "../item-utils";
 import type { EfficiencyContext } from "./context";
-import { candidateRecipes, externalKey, recipeFlows, type RecipeFlows } from "./recipes";
+import { candidateRecipes, externalKey, primaryOutput, recipeFlows, type RecipeFlows } from "./recipes";
 
 /** Extra weight per cauldron slot that isn't plant-based, in machines */
 const NON_PLANT_SLOT_COST = 4;
@@ -55,7 +55,13 @@ function buildWeight(recipe: Recipe): number {
     return 1 + heated + heavy * NON_PLANT_SLOT_COST + shared * SHARED_SLOT_COST;
 }
 
-export function buildModel(config: PlannerConfig, ctx: EfficiencyContext): PlanModel {
+/**
+ * `ownMakers`: each target is made at its rate by recipes whose main output it is (where
+ * there are any) or the supply, so it gets its own node. Without this the program may cover a
+ * target as another recipe's byproduct: the twin nursery recipe (gentian for gentian
+ * nectar) or the sulfur smelter for iron ingot past a recipe the player locked
+ */
+export function buildModel(config: PlannerConfig, ctx: EfficiencyContext, ownMakers = true): PlanModel {
     const targets = sumRates(config.targets);
     const supplies = sumRates(config.availableResources);
     const variables: Record<string, Record<string, number>> = {};
@@ -73,6 +79,8 @@ export function buildModel(config: PlannerConfig, ctx: EfficiencyContext): PlanM
             (value > 0 ? produced : used).add(key);
         }
         const cost = ctx.machineWeight * f.machineMinutes * buildWeight(recipe);
+        const main = primaryOutput(recipe);
+        if (ownMakers && targets.has(main)) coefficients[`main:${main}`] = f.outputs.get(main) ?? 0;
         if (cost > 0) coefficients.cost = cost;
         variables[`craft:${recipe.id}`] = coefficients;
     }
@@ -89,8 +97,10 @@ export function buildModel(config: PlannerConfig, ctx: EfficiencyContext): PlanM
 
     const constraints: Record<string, Constraint> = {};
     for (const key of new Set([...used, ...produced])) constraints[row(key)] = { min: targets.get(key) ?? 0 };
+    for (const [item, rate] of targets) if (Object.values(variables).some((v) => v[`main:${item}`])) constraints[`main:${item}`] = { min: rate };
     for (const [item, rate] of supplies) {
-        variables[`supply:${item}`] = { [row(item)]: 1, [`cap:${item}`]: 1 };
+        // Supply covers a target as well as its own recipes would
+        variables[`supply:${item}`] = { [row(item)]: 1, [`cap:${item}`]: 1, ...(ownMakers && targets.has(item) ? { [`main:${item}`]: 1 } : {}) };
         constraints[`cap:${item}`] = { max: rate };
         constraints[row(item)] ??= { min: 0 };
     }

@@ -163,8 +163,10 @@ export function simulateFlow(placements: Placement[], recipeOf: RecipeOf = recip
         const r = recipeOf(p, got);
         const wanted = new Set((r?.inputs ?? []).map(itemKey));
         const own = links.filter((l) => l.port.uid === p.uid);
+        // Only pipe ports of a recipe that moves a fluid matter (the Advanced Assembler's pipe idles for a pocket watch)
+        const usesPipes = !!r && [...r.inputs, ...r.outputs].some(isFluid);
         const blockedPipes = own.filter((l) => {
-            if (l.port.medium !== "pipe" || l.connectedTo) return false;
+            if (!usesPipes || l.port.medium !== "pipe" || l.connectedTo) return false;
             const [x, y, z] = portTarget(l.port);
             return (occupancy.get(`${x},${y},${z}`) ?? []).some((o) => !o.id.startsWith("pipe"));
         }).length;

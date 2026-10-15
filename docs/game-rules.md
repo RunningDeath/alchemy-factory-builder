@@ -205,3 +205,4 @@ Sources here: **[Player]** answers (Oct 2026) and **[Text]**, the game's own Eng
 
 1. **Arcane Processor layout:** three inputs on one cell from three sides; the generator has to be taught it.
 2. **Thermal Extractor height in the planner:** the bonus is known (above) but the planner doesn't ask at what height the extractors stand.
+3. **Paradox Crucible in the planner:** the data has only Vitae ↔ Mors, not "any item → Mors", so Mors, Vitae and everything made from them (Quicksilver, Gold Dust/Ingot/Coin, Obsidian, Volcanic Ash, Sol, Venus, …) never plan unless supplied. Open: how a belt-fed crucible forms its batch (waits for a full stack, or starts with whatever is in its slot when idle).

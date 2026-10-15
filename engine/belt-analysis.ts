@@ -110,14 +110,33 @@ const recipesById = new Map<string, Recipe>(
  * The byproduct an edge carries when the consumer doesn't use the source's main output
  * but one of its other outputs (sand from crushing rock salt), per main output
  */
-function byproductOf(source?: NodeBeltInfo, target?: NodeBeltInfo): FlowEdge["byproduct"] {
-  if (!source || !target || source.perMachineOutputs.length < 2) return undefined;
-  const wanted = new Set(target.perMachineInputs.map((f) => f.itemName));
+function byproductOf(source: NodeBeltInfo | undefined, wanted: Map<string, number>): FlowEdge["byproduct"] {
+  if (!source || source.perMachineOutputs.length < 2) return undefined;
   if (wanted.has(source.itemName)) return undefined;
   const main = source.perMachineOutputs.find((o) => o.itemName === source.itemName);
   const other = source.perMachineOutputs.find((o) => o.itemName !== source.itemName && wanted.has(o.itemName));
   if (!main || !other || main.perMachineRate <= 0) return undefined;
   return { item: other.itemName, perMain: other.perMachineRate / main.perMachineRate };
+}
+
+/**
+ * Flow edges for one plan edge. A consumer taking several outputs of one source (a cauldron
+ * mixing gentian and gentian nectar from the same nursery) gets one edge per output: the
+ * plan edge carries their sum, split here by what the consumer's recipe needs of each
+ */
+function flowEdgesOf(key: string, source: string, target: string, demand: number, from: NodeBeltInfo | undefined, needs: Map<string, number>): FlowEdge[] {
+  const outs = from?.perMachineOutputs ?? [];
+  const main = outs.find((o) => o.itemName === from?.itemName);
+  const taken = outs.filter((o) => needs.has(o.itemName) && o.perMachineRate > 0);
+  if (taken.length < 2 || !main || main.perMachineRate <= 0) return [{ key, source, target, demand, byproduct: byproductOf(from, needs) }];
+  const total = taken.reduce((sum, o) => sum + needs.get(o.itemName)!, 0);
+  return taken.map((o) => ({
+    key: o === main ? key : `${key}#${o.itemName}`,
+    source,
+    target,
+    demand: (demand * needs.get(o.itemName)!) / total,
+    byproduct: o === main ? undefined : { item: o.itemName, perMain: o.perMachineRate / main.perMachineRate },
+  }));
 }
 
 /** Items that travel through pipes, based on item category. */
@@ -352,15 +371,38 @@ export function analyzeBelts(
     capacity: node.isRaw ? Infinity : nodes[key].build?.actualRate ?? node.rate,
     isRaw: node.isRaw,
   }));
-  const flowEdges: FlowEdge[] = Array.from(graph.edgeRates.entries()).map(([key, demand]) => {
+  // Flow edge → the plan edge it belongs to (one plan edge may carry several outputs)
+  const planEdge = new Map<string, string>();
+  // What one machine of a node takes of each item: its recipe inputs and the fuel it burns
+  const fuel = getItem(ctx.selectedFuel);
+  const needsOf = (key: string) => {
+    const needs = new Map((nodes[key]?.perMachineInputs ?? []).map((f) => [f.itemName, f.perMachineRate]));
+    const node = graph.nodes.get(key);
+    if (fuel?.heat_value && node && node.heatConsumption > 0 && node.deviceCount > 0) {
+      const burnt = node.heatConsumption / node.deviceCount / (fuel.heat_value * ctx.fuelMultiplier);
+      needs.set(fuel.name, (needs.get(fuel.name) ?? 0) + burnt);
+    }
+    return needs;
+  };
+  const flowEdges: FlowEdge[] = Array.from(graph.edgeRates.entries()).flatMap(([key, demand]) => {
     const [source, target] = splitEdgeKey(key);
-    return { key, source, target, demand, byproduct: byproductOf(nodes[source], nodes[target]) };
+    const list = flowEdgesOf(key, source, target, demand, nodes[source], needsOf(target));
+    list.forEach((fe) => planEdge.set(fe.key, key));
+    return list;
   });
   // The rate the player asked for: the net output may be more (a fertilizer reserve that
   // isn't eaten leaves as product too)
   // (targets hold item ids or names, nodes display names)
   const asked = (item: string) => config.targets.filter((t) => normalizeItemId(t.item) === normalizeItemId(item)).reduce((sum, t) => sum + t.rate, 0) || undefined;
-  const targetList = roots.map((r) => ({ nodeKey: nodeKeyOf(r), itemName: r.itemName, demand: Math.min(r.netOutputRate ?? r.rate, asked(r.itemName) ?? Infinity) }));
+  // Several roots of one item (two recipes, or made and supplied) share what was asked
+  const netOf = (r: ProductionNode) => Math.max(0, r.netOutputRate ?? r.rate);
+  const netByItem = new Map<string, number>();
+  roots.forEach((r) => netByItem.set(normalizeItemId(r.itemName), (netByItem.get(normalizeItemId(r.itemName)) ?? 0) + netOf(r)));
+  const targetList = roots.map((r) => {
+    const all = netByItem.get(normalizeItemId(r.itemName))!;
+    const want = asked(r.itemName) ?? Infinity;
+    return { nodeKey: nodeKeyOf(r), itemName: r.itemName, demand: all > want ? (netOf(r) * want) / all : netOf(r) };
+  });
   const flow = simulateFlow(
     flowNodes,
     flowEdges,
@@ -372,9 +414,9 @@ export function analyzeBelts(
   const warnings: MachineWarning[] = [];
   const surpluses: BeltReport["surpluses"] = [];
 
-  // What consumers and targets actually take from each node
+  // What consumers and targets actually take of each node's main output
   const taken = new Map<string, number>();
-  flowEdges.forEach((fe) => taken.set(fe.source, (taken.get(fe.source) || 0) + (flow.edgeActual.get(fe.key) ?? 0)));
+  flowEdges.forEach((fe) => !fe.byproduct && taken.set(fe.source, (taken.get(fe.source) || 0) + (flow.edgeActual.get(fe.key) ?? 0)));
   targetList.forEach((t, i) => taken.set(t.nodeKey, (taken.get(t.nodeKey) || 0) + flow.delivered[i]));
 
   Object.entries(nodes).forEach(([key, info]) => {
@@ -411,11 +453,13 @@ export function analyzeBelts(
   const edges: BeltReport["edges"] = {};
   flowEdges.forEach((fe) => {
     const offered = flow.edgeOffered.get(fe.key) ?? Infinity;
-    edges[fe.key] = {
-      demand: fe.demand,
-      actual: flow.edgeActual.get(fe.key) ?? fe.demand,
+    const key = planEdge.get(fe.key)!;
+    const before = edges[key];
+    edges[key] = {
+      demand: (before?.demand ?? 0) + fe.demand,
+      actual: (before?.actual ?? 0) + (flow.edgeActual.get(fe.key) ?? fe.demand),
       // Short only when the producer can't supply it; a consumer taking less leaves producer surplus
-      short: offered < fe.demand - 0.05,
+      short: !!before?.short || offered < fe.demand - 0.05,
     };
   });
 

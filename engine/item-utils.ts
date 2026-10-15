@@ -14,9 +14,12 @@ const devices = (Array.isArray(devicesData) ? devicesData : Object.values(device
 
 const itemById = new Map<string, Item>();
 const itemByName = new Map<string, Item>();
+/** Display names as written: "Mercury" (the planet, id mercuryp) is not the id mercury (Quicksilver) */
+const itemByExactName = new Map<string, Item>();
 for (const item of items) {
     itemById.set(item.id, item);
     itemByName.set(item.name.toLowerCase(), item);
+    itemByExactName.set(item.name, item);
 }
 const recipeById = new Map(recipes.map((r) => [r.id, r]));
 const deviceByKey = new Map<string, Device>();
@@ -27,6 +30,8 @@ for (const d of devices) {
 
 /** Item id for an id or a display name (unknown names come back lowercased) */
 export function normalizeItemId(ref: string): string {
+    const named = itemByExactName.get(ref);
+    if (named) return named.id;
     const lower = ref.toLowerCase();
     if (itemById.has(lower)) return lower;
     return itemByName.get(lower)?.id ?? lower;
