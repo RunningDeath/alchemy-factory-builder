@@ -79,6 +79,7 @@ targets, research, settings
 3. **Starter box mark** on the step that makes the nurseries' self-made fertilizer.
 4. **Machine pairs** (`pairs.ts`): a machine whose whole output goes into one machine of the next step becomes one made-up building (nursery + grinder at its output).
 5. **Enhanced grinders** where their block takes less floor.
+   Machines face so their inputs are on the left and outputs on the right; on a tie, an output toward the end of the block wins over one toward the input header (the Shaper).
 6. **Per step, one or more blocks:**
    - **`buildTier`:**
      - Machines in columns × rows × levels, with lanes along the machines (one belt per input item, stacked lanes with lifts between levels, a header in front).

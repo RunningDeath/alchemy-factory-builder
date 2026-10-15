@@ -114,12 +114,12 @@ The human-readable version with diagrams is `docs/game-rules.html`. Open questio
   - Trash Barrel: takes belts at height 3.
   - Dispatch Portal: sells.
   - Byproducts that can't stay on a belt go to one of them. **[Data]**
-- **Shaper:** its front output still needs a belt laid by hand (not yet taught). **[Data]**
+- **Shaper:** 3 inputs on each of two opposite sides, output on a third side; the generator turns it so the output faces the end of the block, where it gets a belt. **[Data]**/**[Player]**
 
 ## 7. Logistics
 
 - **Plain belts:** player blueprints only use the plain belt for straight runs, turns, splits and merges. `BaseActiveIndex` holds the connected sides relative to the front (front 1, right 2, back 4, left 8; outputs shifted by 4). **[Blueprint]** (429 belts in 18 blueprints)
-- **Plain belt splits share evenly, whatever the shape:** straight + side, or left + right (a T). **[Player]** (an earlier note said "straight first"; that applies only to the Priority Splitter)
+- **Plain belt splits share evenly, whatever the shape:** straight + side, or left + right (a T), in halves; a 3-way split (left, straight, right) in thirds. **[Player]** (an earlier note said "straight first"; that applies only to the Priority Splitter)
 - **Merge:** the same belt shape with the branch running **into** the line is a merge (two belts in, one out), not a split. A plain merge takes from both inputs **alternately, fairly**. What decides split versus merge is the direction of the branch. **[Player]**
 - **Priority Splitter (vertical, 2×1×2):** in on one side, two outputs on the other. The lower output gets **everything first**; the upper only gets items when the lower backs up. Used for "module first, overflow to export". **[Player]**/**[Blueprint]**
 - **Filter Splitter:**
@@ -195,7 +195,7 @@ Sources here: **[Player]** answers (Oct 2026) and **[Text]**, the game's own Eng
 | Thermal Extractor | The higher up it is built, the more it puts out (pipe output on top). | [Text] |
 | Advanced Athanor catalysts | Unstable: changes output chances. Fertile: doubles the output. Resonant: all products at once. Eternal: uses no materials. Each catalyst has charges; the cost per craft depends on the recipe; several can work at once. Standard Athanor recipes keep their heat. Still not modelled. | [Text] |
 | Nursery | Seeds are not consumed; output rate follows the fertilizer's fertility. | [Text] |
-| Untaught machines (game data) | **Shaper** (3×3×4): 3 inputs left, 3 right, output at the **front** (faces the input header: needs a hand belt). **Advanced Shaper** (5×5×6): 5 inputs left, output right, pipes front and back. **Arcane Shaper** (our `aether-shaper`, 9×9×10): 9 inputs left, output right. **Arcane Processor** (3×5×4): all three inputs on **one cell** from three sides, output raised (height 3, left): not handled by the generator. **Advanced Assembler** (our `omni-machine`): 3 inputs left, output right, pipe left one level up. **Paradox Crucible** (heated): input front, output back, both one level up (gets belts through the raised-input stub). **Advanced Athanor**: three outputs, one per product. Nothing found online. | [Data] |
+| Untaught machines (game data) | **Shaper** (3×3×4): 3 inputs on each of two opposite sides, the output in the middle of a third side (confirmed by the player's screenshot); the generator turns it so the output faces the end of the block. **Advanced Shaper** (5×5×6): 5 inputs left, output right, pipes front and back. **Arcane Shaper** (our `aether-shaper`, 9×9×10): 9 inputs left, output right. **Arcane Processor** (3×5×4): all three inputs on **one cell** from three sides, output raised (height 3, left): not handled by the generator. **Advanced Assembler** (our `omni-machine`): 3 inputs left, output right, pipe left one level up. **Paradox Crucible** (heated): input front, output back, both one level up (gets belts through the raised-input stub). **Advanced Athanor**: three outputs, one per product. Nothing found online. | [Data] |
 | Machine ports from the texts | Shaper: 6 belt inputs. Advanced Shaper: 5 belt + 2 pipe inputs. Aether Shaper: 9 belt inputs. Each crafts gradually as materials come in. Omni Machine: 3 belt + 1 pipe input. Refiner: 2 belt inputs. Advanced Blender: 2 belt + 1 pipe input. Alembic: 1 belt + 1 pipe in, 1 pipe out. Extractor: 1 belt in, 1 pipe out. | [Text] |
 | Sinks | Trash Barrel: 4 belt inputs, emptied each night. Dispatch Portal: buyers have a limited daily demand, so it isn't an unlimited sink. | [Text] |
 | Storage boxes | Small Storage Box: 1 belt in, 1 out, several modes (used as the starter box). Large Storage Box: 2 in, 2 out. | [Text] |
@@ -204,6 +204,4 @@ Sources here: **[Player]** answers (Oct 2026) and **[Text]**, the game's own Eng
 ## Still open
 
 1. **Arcane Processor layout:** three inputs on one cell from three sides; the generator has to be taught it.
-2. **Shaper front output:** the generator leaves it for a hand belt.
-3. **Thermal Extractor height in the planner:** the bonus is known (above) but the planner doesn't ask at what height the extractors stand.
-4. **3-way belt split:** one belt in, three out (left, straight, right). Assumed to share evenly in thirds like the 2-way split shares in halves; not checked in game.
+2. **Thermal Extractor height in the planner:** the bonus is known (above) but the planner doesn't ask at what height the extractors stand.

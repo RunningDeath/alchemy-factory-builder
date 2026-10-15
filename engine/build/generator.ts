@@ -229,9 +229,13 @@ export function machineRotation(fp: BuildingFootprint): Rotation {
     let bestScore = -Infinity;
     for (const rot of [0, 1, 2, 3] as Rotation[]) {
         const ports = footprintPorts(fp, rot).filter((p) => p.medium === "belt");
+        // Ties: an output toward the input header (up) has no room for its belt; toward the
+        // end of the block (down), where the output lanes leave, it does (the Shaper's front output)
         const score =
             ports.filter((p) => p.dir === "in" && p.face === "left").length +
-            ports.filter((p) => p.dir === "out" && p.face === "right").length;
+            ports.filter((p) => p.dir === "out" && p.face === "right").length +
+            0.5 * ports.filter((p) => p.dir === "out" && p.face === "down").length -
+            0.5 * ports.filter((p) => p.dir === "out" && p.face === "up").length;
         if (score > bestScore) {
             best = rot;
             bestScore = score;

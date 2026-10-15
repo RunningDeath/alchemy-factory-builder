@@ -250,6 +250,23 @@ describe("separate inputs, filters and heating", () => {
     expect(mod.placements.some((p) => p.id === "stone-stove")).toBe(false);
   });
 
+  test("the shaper turns so its output faces away from the input header and gets a belt", () => {
+    // 3 inputs on each of two opposite sides, the output on a third side (checked in game)
+    const mod = generateModule(
+      [
+        step({
+          deviceId: "shaper",
+          machines: 3,
+          inputs: ["Iron Ingot", "Glass", "Linen", "Plank", "Clay", "Sand"].map((itemName) => ({ itemName, perMachineRate: 2 })),
+          outputs: [{ itemName: "Product", perMachineRate: 1 }],
+        }),
+      ],
+      options,
+    );
+    expect(validateLayout(mod.placements)).toEqual([]);
+    expect(unconnectedMachinePorts(mod)).toEqual([]);
+  });
+
   test("a raised input that is the machine's only one gets a belt: iron smelters take ore at the top", () => {
     // Before, raised inputs were skipped (another port takes the items): the smelters' only input
     // stayed open and the purchasing portal's ore left at the edge
