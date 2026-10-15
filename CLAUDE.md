@@ -6,6 +6,10 @@
 - No code copied from other Alchemy Factory projects (none of them has a license). Use them only as references for game mechanics and write our own implementation.
 - Game icons (`public/game-icons/`) are exported from the game with tools/extract-game-data and published (fan project, credited in the README). Never copy icons from other projects. `lib/itemGlyph.ts` gives items without an icon our own symbol.
 
+## Game rules and algorithms
+
+Read `docs/game-rules.md` (every game rule with its source, and what is still unknown) and `docs/algorithm.md` (the pipeline from targets to blueprint) before changing the planner or the generator. Add new rules there, tagged by source. Judge generator changes with `bun run benchmark` (run, then compare).
+
 ## Layout
 
 ```
