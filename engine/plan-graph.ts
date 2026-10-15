@@ -54,7 +54,9 @@ export function collectPlanGraph(rootNodes: ProductionNode[]): PlanGraph {
         }
         for (const input of node.inputs) {
             const inputKey = nodeKeyOf(input);
-            if (inputKey !== key) addEdgeRate(edgeKey(inputKey, key), node.inputRates?.[inputKey] ?? input.rate);
+            // A fuel/fertilizer reference carries its own rate; a shared producer node its consumer's share
+            const rate = input.isConsumptionReference ? input.rate : (node.inputRates?.[inputKey] ?? input.rate);
+            if (inputKey !== key) addEdgeRate(edgeKey(inputKey, key), rate);
             // An edge-only copy stands for its producer: carry on with the producer itself
             visit(input.isConsumptionReference ? (input.inputs[0] ?? input) : input);
         }

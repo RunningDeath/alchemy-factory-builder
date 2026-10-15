@@ -104,7 +104,9 @@ export function simulateFlow(nodes: FlowNode[], edges: FlowEdge[], targets: Flow
 
         const potential = node.demand * supplyFactor;
         const value = Math.max(0, Math.min(node.capacity, potential));
-        if (potential < node.capacity - RATE_EPSILON) inputLimited.add(key);
+        // Input-limited only when the inputs keep it below what it should make: a rounded-up
+        // node making exactly its demand from full supply is demand-limited, not input-limited
+        if (potential < Math.min(node.capacity, node.demand) - RATE_EPSILON) inputLimited.add(key);
         realized.set(key, value);
         return value;
     }
