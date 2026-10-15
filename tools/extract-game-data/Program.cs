@@ -38,6 +38,10 @@ if (iconsMode) args = args[1..];
 // Every data table, one JSON file each: dotnet run -- tables <paks dir> <mappings.usmap> <out dir>
 var tablesMode = args.Length > 0 && args[0] == "tables";
 if (tablesMode) args = args[1..];
+// Any package as JSON (blueprint scripts included): dotnet run -- export <paks dir> <mappings.usmap> <out.json> <package path>
+var exportMode = args.Length == 5 && args[0] == "export";
+var exportPackage = exportMode ? args[4] : "";
+if (exportMode) args = args[1..4];
 if (args.Length < 3)
 {
     Console.Error.WriteLine("Usage: dotnet run -- <paks dir> <mappings.usmap> <out.json>");
@@ -61,6 +65,14 @@ var provider = new DefaultFileProvider(paksDir, SearchOption.TopDirectoryOnly, n
 };
 provider.Initialize();
 provider.Mount();
+
+if (exportMode)
+{
+    var exports = provider.LoadPackage(exportPackage).GetExports();
+    File.WriteAllText(outPath, JsonConvert.SerializeObject(exports, Formatting.Indented));
+    Console.WriteLine($"Wrote {exports.Count()} exports of {exportPackage} to {outPath}");
+    return 0;
+}
 
 if (tablesMode)
 {

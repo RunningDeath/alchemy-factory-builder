@@ -61,3 +61,7 @@ dotnet run -c Release -- tables "<Steam>/steamapps/common/Alchemy Factory/Alchem
 ```
 
 The useful ones: `DT_Enemies` (items, despite the name), `DT_EnemyCrafting` (recipes; `CraftType` names the machine, `FractionNum` says how many crafts one input lasts), `DT_PlantSeedConfig` (growth), `DT_Improvements` and `DT_Attributes` (research effects), `DT_Buildings`. Keep the mappings file outside the repo (it is made from the game).
+
+## One asset as JSON
+
+`dotnet run -c Release -- export <paks dir> <mappings.usmap> <out.json> <package path>` writes any package (e.g. `AlchemyFactory/Content/Blueprints/Buildings/BP_ThermalExtractor`) with its exports and properties. Logic written in C++ (like the Thermal Extractor height bonus) isn't in there.

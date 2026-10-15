@@ -176,6 +176,9 @@ Sources here: **[Player]** answers (Oct 2026) and **[Text]**, the game's own Eng
 | Point | What we know now | Source |
 |---|---|---|
 | Game data | Compared on 2026-10-15 with the game's own tables (version 5.7.4): all 180 items and 161 recipes in `data/` match. Two notations differ, the rates don't: **bulk items** (negative `MaximumStack`, e.g. Logs −200) store heat per portion (Logs 10 × 200 = our 2000), and **`FractionNum`** says how many crafts one input lasts (1 Log → 200 Planks at 2 s each = our 200 per 400 s). | [Game] |
+| Thermal Extractor height | Output grows with build height: +100 % per 128 height units, capped at +200 % (×3 from height 256). The game's blueprint only sets `bThermal`; the formula is in compiled code, so it comes from the Alchemy Factory Codex calculator (and starfi5h: ×1 at 0 to ×3 at 255). Not modelled yet. | [Calc] |
+| Coins on belts | A coin belt has the normal belt capacity, but coins travel in bulk: a stack of coins (e.g. 50 Gold) is one item on the belt. The player picks copper, silver or gold. One money line is enough in practice. | [Player] |
+| Seeds | Exactly one seed goes into a nursery. | [Player] |
 | Starter box size | One small storage box is enough to start a self-fertilizing (or self-fueled) loop. | [Player] |
 | Purchasing Portal speed | Not calculated; how fast to buy is the player's choice. A portal delivers raw materials up to one belt's speed. It takes any coin and exchanges automatically. | [Player], [Text] |
 | Lifts | Any height. Exactly one input at the bottom end and one output at the top end (or the reverse when switched to downwards), nothing in between. That's why stacked machines can't share one lift. | [Player], [Text] |
@@ -192,6 +195,7 @@ Sources here: **[Player]** answers (Oct 2026) and **[Text]**, the game's own Eng
 | Thermal Extractor | The higher up it is built, the more it puts out (pipe output on top). | [Text] |
 | Advanced Athanor catalysts | Unstable: changes output chances. Fertile: doubles the output. Resonant: all products at once. Eternal: uses no materials. Each catalyst has charges; the cost per craft depends on the recipe; several can work at once. Standard Athanor recipes keep their heat. Still not modelled. | [Text] |
 | Nursery | Seeds are not consumed; output rate follows the fertilizer's fertility. | [Text] |
+| Untaught machines (game data) | **Shaper** (3×3×4): 3 inputs left, 3 right, output at the **front** (faces the input header: needs a hand belt). **Advanced Shaper** (5×5×6): 5 inputs left, output right, pipes front and back. **Arcane Shaper** (our `aether-shaper`, 9×9×10): 9 inputs left, output right. **Arcane Processor** (3×5×4): all three inputs on **one cell** from three sides, output raised (height 3, left): not handled by the generator. **Advanced Assembler** (our `omni-machine`): 3 inputs left, output right, pipe left one level up. **Paradox Crucible** (heated): input front, output back, both one level up (gets belts through the raised-input stub). **Advanced Athanor**: three outputs, one per product. Nothing found online. | [Data] |
 | Machine ports from the texts | Shaper: 6 belt inputs. Advanced Shaper: 5 belt + 2 pipe inputs. Aether Shaper: 9 belt inputs. Each crafts gradually as materials come in. Omni Machine: 3 belt + 1 pipe input. Refiner: 2 belt inputs. Advanced Blender: 2 belt + 1 pipe input. Alembic: 1 belt + 1 pipe in, 1 pipe out. Extractor: 1 belt in, 1 pipe out. | [Text] |
 | Sinks | Trash Barrel: 4 belt inputs, emptied each night. Dispatch Portal: buyers have a limited daily demand, so it isn't an unlimited sink. | [Text] |
 | Storage boxes | Small Storage Box: 1 belt in, 1 out, several modes (used as the starter box). Large Storage Box: 2 in, 2 out. | [Text] |
@@ -199,8 +203,7 @@ Sources here: **[Player]** answers (Oct 2026) and **[Text]**, the game's own Eng
 
 ## Still open
 
-1. **Thermal Extractor height formula:** starfi5h uses ×1 at height 0 rising to ×3 at height 255. Unverified, not modelled.
-2. **Coins on belts:** can one coin line carry everything, or are coins limited like items? (starfi5h assumes 50× a belt.)
-3. **Seed counts:** seeds a nursery needs are taken from the recipe; unverified.
-4. **Untaught machine layouts:** Shaper, Advanced Shaper and Aether Shaper (front output), Arcane Processor (raised output, Arcane Fountain input), Omni Machine, Paradox Crucible in modules.
-5. **3-way belt split:** assumed to share evenly like the 2-way split.
+1. **Arcane Processor layout:** three inputs on one cell from three sides; the generator has to be taught it.
+2. **Shaper front output:** the generator leaves it for a hand belt.
+3. **Thermal Extractor height in the planner:** the bonus is known (above) but the planner doesn't ask at what height the extractors stand.
+4. **3-way belt split:** one belt in, three out (left, straight, right). Assumed to share evenly in thirds like the 2-way split shares in halves; not checked in game.

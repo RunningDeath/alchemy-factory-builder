@@ -360,6 +360,9 @@
     <table>
       <tr><th>Point</th><th>What we know now</th><th>Source</th></tr>
       <tr><td>Game data</td><td>All 180 items and 161 recipes match the game (version 5.7.4), checked against its own tables.</td><td><span class="tag t-data">Game</span></td></tr>
+      <tr><td>Thermal Extractor</td><td>+100 % output per 128 height units, up to +200 % (community calculators; the game's formula is compiled).</td><td><span class="tag t-calc">Calc</span></td></tr>
+      <tr><td>Coins</td><td>Normal belt capacity, but a stack of coins (e.g. 50 Gold) is one item; you choose copper, silver or gold.</td><td><span class="tag t-player">Player</span></td></tr>
+      <tr><td>Seeds</td><td>Exactly one seed per nursery.</td><td><span class="tag t-player">Player</span></td></tr>
       <tr><td>Starter box</td><td>One small storage box is enough to start the loop.</td><td><span class="tag t-player">Player</span></td></tr>
       <tr><td>Purchasing Portal</td><td>Speed not calculated (your choice); up to one belt of raw materials. Takes any coin.</td><td><span class="tag t-player">Player</span></td></tr>
       <tr><td>Lifts</td><td>Any height; one input and one output at the two ends, nothing in between.</td><td><span class="tag t-player">Player</span></td></tr>
@@ -380,8 +383,10 @@
   <h3>Still open</h3>
   <div class="card unknown">
     <ul>
-      <li><span class="prio">Medium</span><b>Untaught machines</b>: Shaper family (front output), Arcane Processor, Omni Machine, Paradox Crucible in modules.</li>
-      <li><span class="prio">Low</span><b>Thermal Extractor height formula</b>, <b>coins on belts</b>, <b>seed counts</b>, <b>3-way split</b>: unverified.</li>
+      <li><span class="prio">Medium</span><b>Arcane Processor</b>: three inputs on one cell from three sides; the generator must be taught it.</li>
+      <li><span class="prio">Medium</span><b>Shaper</b>: output at the front, still a hand belt.</li>
+      <li><span class="prio">Low</span><b>Thermal Extractor height</b>: the bonus is known, the planner doesn't ask for the height yet.</li>
+      <li><span class="prio">Low</span><b>3-way belt split</b> (in + left, straight, right): assumed thirds.</li>
     </ul>
   </div>
   <p class="lead" style="font-size:.85rem">Agent version: <code>docs/game-rules.md</code>.</p>
