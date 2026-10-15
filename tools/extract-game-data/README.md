@@ -40,3 +40,14 @@ dotnet run -c Release -- icons "<Steam>/steamapps/common/Alchemy Factory/Alchemy
 ```
 
 This writes 64×64 PNGs to `public/game-icons/buildings/<building id>.png` (from `DT_Buildings.DisplayIcon`) and `public/game-icons/items/<item id>.png`, plus a `manifest.json` that lists them (the app reads it first, so it only requests icons that exist). The ids come from `data/building-footprints.json` and `data/items.json`. The paks have no item table, so the item icon paths are read from the [AlchemyFactoryData](https://github.com/faultyd3v/AlchemyFactoryData) `items.json`. That step needs internet access.
+
+## Game texts only
+
+The English names, descriptions and manuals (`Game.locres`) can be read without a mappings file:
+
+```bash
+cd tools/extract-game-data
+dotnet run -c Release -- strings "<Steam>/steamapps/common/Alchemy Factory/AlchemyFactory/Content/Paks" path/to/strings.json
+```
+
+Useful for checking how buildings behave (docs/game-rules.md cites them as [Text]).

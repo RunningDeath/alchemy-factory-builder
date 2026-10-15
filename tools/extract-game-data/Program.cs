@@ -14,6 +14,25 @@ using CUE4Parse.UE4.Localization;
 using CUE4Parse.UE4.Versions;
 using Newtonsoft.Json;
 
+// English texts only (names, descriptions, tooltips): needs no mappings file
+if (args.Length == 3 && args[0] == "strings")
+{
+    var oodle = Path.Combine(AppContext.BaseDirectory, "oo2core_9_win64.dll");
+    if (!File.Exists(oodle)) OodleHelper.DownloadOodleDll(ref oodle);
+    OodleHelper.Initialize(oodle);
+    var files = new DefaultFileProvider(args[1], SearchOption.TopDirectoryOnly, new VersionContainer(EGame.GAME_UE5_7), StringComparer.OrdinalIgnoreCase);
+    files.Initialize();
+    files.Mount();
+    var texts = new FTextLocalizationResource(files.CreateReader("AlchemyFactory/Content/Localization/Game/en/Game.locres"));
+    var strings = new SortedDictionary<string, string>();
+    foreach (var ns in texts.Entries)
+        foreach (var entry in ns.Value)
+            strings.TryAdd($"{ns.Key.Str}/{entry.Key.Str}", entry.Value.LocalizedString);
+    File.WriteAllText(args[2], JsonConvert.SerializeObject(strings, Formatting.Indented));
+    Console.WriteLine($"Wrote {strings.Count} strings to {args[2]}");
+    return 0;
+}
+
 var iconsMode = args.Length > 0 && args[0] == "icons";
 if (iconsMode) args = args[1..];
 if (args.Length < 3)

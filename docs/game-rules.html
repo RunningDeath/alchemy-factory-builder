@@ -354,23 +354,35 @@
     <p>PNG preview → tagged-property header → Oodle-compressed body → 8-byte trailer (length, magic <code>0x5042AFD5</code>). The body lists buildings with rotation, pivot, <code>BaseActiveIndex</code>, <code>RecipeName</code>, <code>SupplyName</code>, <code>FilterName</code>, <code>CauldronFilterName</code>, <code>SeedName</code>, <code>CustomColor</code>. Pipes: side bits like belts, +16 down, +32 up. <span class="tag t-bp">Blueprint</span></p>
   </div>
 
-  <h2 id="unknown">12. What we don't know yet</h2>
+  <h2 id="unknown">12. Open points: what we found out</h2>
+  <p class="lead">From your answers and the game's own texts (building descriptions and manuals).</p>
+  <div class="table-wrap card">
+    <table>
+      <tr><th>Point</th><th>What we know now</th><th>Source</th></tr>
+      <tr><td>Starter box</td><td>One small storage box is enough to start the loop.</td><td><span class="tag t-player">Player</span></td></tr>
+      <tr><td>Purchasing Portal</td><td>Speed not calculated (your choice); up to one belt of raw materials. Takes any coin.</td><td><span class="tag t-player">Player</span></td></tr>
+      <tr><td>Lifts</td><td>Any height; one input and one output at the two ends, nothing in between.</td><td><span class="tag t-player">Player</span></td></tr>
+      <tr><td>Steam Heating Pad</td><td>One pipe connection on each of two opposite sides, input or output; rotate pads so they line up.</td><td><span class="tag t-player">Player</span></td></tr>
+      <tr><td>Pipes</td><td>No limits, no direction; a piece is horizontal or vertical (X or Y plane).</td><td><span class="tag t-player">Player</span></td></tr>
+      <tr><td>Catapults, cannons</td><td>Ignored for now.</td><td><span class="tag t-player">Player</span></td></tr>
+      <tr><td>Priority Merger</td><td>Items from the first input go first.</td><td><span class="tag t-data">Game text</span></td></tr>
+      <tr><td>Priority Splitter</td><td>Items go to the first output first.</td><td><span class="tag t-data">Game text</span></td></tr>
+      <tr><td>Balanced Splitter</td><td>Splits evenly, stops if an output is blocked; not in the build menu.</td><td><span class="tag t-data">Game text</span></td></tr>
+      <tr><td>Furnaces</td><td>Our "stove" is the game's Stone Furnace (9 slots); our "furnace" is the Blast Furnace (7×6×3, 42 slots).</td><td><span class="tag t-data">Game text</span></td></tr>
+      <tr><td>Thermal Extractor</td><td>The higher it stands, the more it makes.</td><td><span class="tag t-data">Game text</span></td></tr>
+      <tr><td>Catalysts</td><td>Unstable: other chances · Fertile: double output · Resonant: all products · Eternal: no materials. Charges per recipe.</td><td><span class="tag t-data">Game text</span></td></tr>
+      <tr><td>Sinks</td><td>Trash Barrel: 4 inputs, emptied each night. Dispatch Portal: limited daily demand.</td><td><span class="tag t-data">Game text</span></td></tr>
+    </table>
+  </div>
+  <h3>Still open</h3>
   <div class="card unknown">
     <ul>
-      <li><span class="prio">High</span><b>Cauldron line filling from the end</b>: one line once filled its last cauldron first. With even splits the cause is unknown (perhaps how machines take items from a passing belt).</li>
-      <li><span class="prio">Low</span><b>3-way belt split</b>: assumed to share evenly like the 2-way one.</li>
-      <li><span class="prio">High</span><b>Merges</b> (plain belt merge, Priority Merger): which input goes first, and is it fair?</li>
-      <li><span class="prio">High</span><b>Machine input buffers</b>: how many items a nursery or cauldron holds; decides how big the starter box fill must be.</li>
-      <li><span class="prio">Medium</span><b>Purchasing Portal speed</b>: assumed one belt.</li>
-      <li><span class="prio">Medium</span><b>Heater burn with research</b>: assumed not sped up (5–9 % fuel difference otherwise).</li>
-      <li><span class="prio">Medium</span><b>Lifts</b>: height and throughput limits, taking or giving items mid-shaft, why stacked cauldrons can't share one.</li>
-      <li><span class="prio">Medium</span><b>Steam pads</b>: which pads heat through neighbours and which need their own pipe.</li>
-      <li><span class="prio">Medium</span><b>Untaught machines</b>: Shaper/Advanced Shaper (front output), Aether Shaper, Arcane Processor, Omni Machine, many-output Refiners, Paradox Crucible in modules.</li>
-      <li><span class="prio">Low</span><b>Stone Furnace</b> (42 slots, 4 heat/s): how it's built and fed.</li>
-      <li><span class="prio">Low</span><b>Pipes</b>: throughput or length limits (treated as unlimited).</li>
-      <li><span class="prio">Low</span><b>Thermal Extractor</b> height bonus and <b>Advanced Athanor catalysts</b>: not modelled.</li>
-      <li><span class="prio">Low</span><b>Catapults</b>, <b>coins on belts</b> (starfi5h: 50× a belt), <b>seed counts</b>: unverified.</li>
-      <li><span class="prio">Low</span><b>Game data freshness</b>: items and recipes come from an external export; re-run the extractor after a patch.</li>
+      <li><span class="prio">High</span><b>Plain belt merge</b>: fair alternation, or does the straight input go first?</li>
+      <li><span class="prio">High</span><b>Cauldron line filling from the end</b>: what caused it, if splits are even?</li>
+      <li><span class="prio">Medium</span><b>Heater burn with research</b>: does a heater's own burn speed up? (assumed not)</li>
+      <li><span class="prio">Medium</span><b>Untaught machines</b>: Shaper family (front output), Arcane Processor, Omni Machine, Paradox Crucible in modules.</li>
+      <li><span class="prio">Low</span><b>Thermal Extractor height formula</b>, <b>coins on belts</b>, <b>seed counts</b>, <b>3-way split</b>: unverified.</li>
+      <li><span class="prio">Low</span><b>Game data</b>: the game's tables need a mappings file (<code>.usmap</code>) to read; texts don't.</li>
     </ul>
   </div>
   <p class="lead" style="font-size:.85rem">Agent version: <code>docs/game-rules.md</code>.</p>

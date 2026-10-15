@@ -54,9 +54,9 @@ The human-readable version with diagrams is `docs/game-rules.html`. Open questio
 
 - **Heated machines must stand on a heating device** ("Can only be built on heating devices"). **[Data]**
 - **Heating devices:**
-  - Stone Stove: burns 1 heat/s itself and has 9 slots.
-  - Steam Heating Pad: 9 slots.
-  - Stone Furnace: 4 heat/s and 42 slots, not used by the generator.
+  - Stone Furnace (id `stone-stove`, 3×3×3): burns 1 heat/s itself and has 9 slots.
+  - Steam Heating Pad (3×3×1): 9 slots; one pipe connection on each of two opposite sides.
+  - Blast Furnace (id `stone-furnace`, 7×6×3): 4 heat/s and 42 slots, not used by the generator.
   - `data/device-metadata.json` **[Data]**/**[Calc]**
 - **Slots taken:**
 
@@ -105,8 +105,8 @@ The human-readable version with diagrams is `docs/game-rules.html`. Open questio
 - **Brine:** large amounts (4000/min) come from rock salt, not athanors. Extractors and blenders have pipe ports; they may stack on other blocks (a suggestion, not a rule), and for brine coming from outside they behave the same as for brine made in the module. **[Player]**
 - **Purchasing Portal:**
   - Each portal sells one item (`SupplyName`), paid in coins (1 silver = 1000 copper, 1 gold = 100 silver).
-  - The portal's speed isn't in the data; it's assumed to deliver up to one belt.
-  - **[Data]**/**[Assumed]**
+  - Speed isn't calculated (the player decides how fast to buy); a portal can deliver up to one belt. It takes any coin.
+  - **[Data]**/**[Player]**
 - **Output sinks:**
   - Knowledge Altar: turns items into knowledge.
   - Trash Barrel: takes belts at height 3.
@@ -124,8 +124,9 @@ The human-readable version with diagrams is `docs/game-rules.html`. Open questio
   - Tall version: the filtered item takes the **lower** output.
   - Flat version: the filtered item takes the **side** output, the rest runs straight.
   - **[Blueprint]**
-- **Balanced Splitter:** in the files, but hidden and not unlockable, so not used. **[Data]**
-- **Conveyor Lifter:** items enter at the bottom (upwards lift) and come out at the top end; a body cell between. **[Data]**
+- **Priority Merger:** items from the first input go first. **[Text]**
+- **Balanced Splitter:** splits evenly and stops when an output is blocked, but isn't in the build menu, so not used. **[Data]**/**[Text]**
+- **Conveyor Lifter:** any height; exactly one input and one output, at its two ends, nothing in between (switchable up or down). **[Player]**/**[Text]**
 - **Drawbridge:** a 3-cell deck on posts, for belts across gaps. **[Data]**
 - **Starter box:**
   - A small side container acts as a belt piece: items go in and out, and you can build on it. **[Player]**
@@ -166,29 +167,39 @@ The human-readable version with diagrams is `docs/game-rules.html`. Open questio
 
 ---
 
-## Unknown or unsure
+## Open points: what we found out
 
-What we don't know or haven't verified, roughly by how much it matters:
+Sources here: **[Player]** answers (Oct 2026) and **[Text]**, the game's own English texts (`Game.locres`, read with `tools/extract-game-data strings`).
 
-1. **3-way belt split** (in + three outputs): assumed to share evenly like the 2-way split, not verified.
-2. **Cauldron line filling from the end:** one cauldron line once filled its last cauldron completely before the others. With even splits, the cause is unknown (perhaps how machines take items from a belt running past them).
-3. **Plain belt merges and the Priority Merger:** which input goes first, and does a merge alternate fairly? Unknown; matters for back flows that join a main line.
-4. **Machine input buffers:** how many items a machine (nursery, cauldron) holds before its input backs up. This decides how much a starter box must hold and how fast a line fills.
-5. **Purchasing Portal speed:** assumed one belt per portal; the data has no rate.
-6. **Heater burn with research:** we assume a heater's own burn doesn't speed up with Factory Efficiency (as starfi5h does). The old planner scaled it, a 5–9 % fuel difference.
-7. **Lifts:** maximum height, throughput, whether a lift can take or give items at intermediate levels (assumed no), and why stacked cauldrons can't share one lift ("can't transport multiple stages").
-8. **Stone Furnace** (42 slots, 4 heat/s): never placed by the generator; how it's built and fed is unclear.
-9. **Steam Heating Pads:** exact rules for which pads are heated through neighbours versus need their own pipe.
-10. **Pipes:** no known throughput or length limit (treated as unlimited); not verified for very long runs or large brine rates.
-11. **Thermal Extractor:** starfi5h models output growing with build height (×1 at height 0 to ×3 at 255); not modelled here.
-12. **Advanced Athanor catalysts** (Unstable, Fertile, Resonant, Eternal): change outputs or use charges; not modelled.
-13. **Machines the generator hasn't been taught or checked:**
-    - Shaper and Advanced Shaper (front output);
-    - Aether Shaper, Arcane Processor (raised output), Omni Machine;
-    - Refiner layouts with many outputs;
-    - Paradox Crucible in modules.
-14. **Catapults** (Throwing Efficiency): not used; their range and throughput are unknown to us.
-15. **Coins on belts:** starfi5h lets coins pass 50× a belt's speed; we keep money on one line and don't cap it. Unclear in game.
-16. **Seed counts:** seeds a nursery needs are taken from the recipe; unverified.
-17. **Game data freshness:** items and recipes come from an external export and may lag behind game updates. Footprints and unlocks come from our own extractor; re-run both after a patch.
-18. **Balanced Splitter:** present but hidden; if a future patch enables it, even splits get easier.
+| Point | What we know now | Source |
+|---|---|---|
+| Starter box size | One small storage box is enough to start a self-fertilizing (or self-fueled) loop. | [Player] |
+| Purchasing Portal speed | Not calculated; how fast to buy is the player's choice. A portal delivers raw materials up to one belt's speed. It takes any coin and exchanges automatically. | [Player], [Text] |
+| Lifts | Any height. Exactly one input at the bottom end and one output at the top end (or the reverse when switched to downwards), nothing in between. That's why stacked machines can't share one lift. | [Player], [Text] |
+| Steam Heating Pad | One pipe connection on one side and one on the opposite side; each can be input or output. Pads pass steam to a neighbour through these; rotate a pad so its connections line up. | [Player], [Data] |
+| Pipes | No throughput or length limit, no direction. A pipe piece is horizontal, or vertical in the X or Y plane. | [Player], [Text] |
+| Catapults, cannons, hoppers | Ignored for now. | [Player] |
+| Priority Merger | Two inputs, one output: items from the **first** input go first. | [Text] |
+| Priority Splitter | One input, two outputs: items go to the **first** output first. | [Text] |
+| Balanced Splitter | Splits evenly into two outputs and stops if either output is blocked. It isn't in the build menu (no unlock), so not used. A "Scale" building splits coins or raw materials evenly. | [Text], [Player] |
+| Stone Stove vs Stone Furnace | The game calls our `stone-stove` the **Stone Furnace** (3×3×3, 9 slots), and our `stone-furnace` is the **Blast Furnace** (7×6×3, 42 slots, larger heating area). Both refill fuel from a belt. | [Text], [Data] |
+| Heating | All devices that need heat stand on a heating device. "Fuel burns faster with more heating devices." | [Text] |
+| Thermal Extractor | The higher up it is built, the more it puts out (pipe output on top). | [Text] |
+| Advanced Athanor catalysts | Unstable: changes output chances. Fertile: doubles the output. Resonant: all products at once. Eternal: uses no materials. Each catalyst has charges; the cost per craft depends on the recipe; several can work at once. Standard Athanor recipes keep their heat. Still not modelled. | [Text] |
+| Nursery | Seeds are not consumed; output rate follows the fertilizer's fertility. | [Text] |
+| Machine ports from the texts | Shaper: 6 belt inputs. Advanced Shaper: 5 belt + 2 pipe inputs. Aether Shaper: 9 belt inputs. Each crafts gradually as materials come in. Omni Machine: 3 belt + 1 pipe input. Refiner: 2 belt inputs. Advanced Blender: 2 belt + 1 pipe input. Alembic: 1 belt + 1 pipe in, 1 pipe out. Extractor: 1 belt in, 1 pipe out. | [Text] |
+| Sinks | Trash Barrel: 4 belt inputs, emptied each night. Dispatch Portal: buyers have a limited daily demand, so it isn't an unlimited sink. | [Text] |
+| Storage boxes | Small Storage Box: 1 belt in, 1 out, several modes (used as the starter box). Large Storage Box: 2 in, 2 out. | [Text] |
+| Belts | Dragging over an existing belt makes a split or merge. Starting belt speed 60/min. A Ramp Conveyor and a wall-mounted Conveyor Tunnel exist (not used by the generator). | [Text] |
+
+## Still open
+
+1. **Plain belt merge:** when two plain belts join, does it alternate fairly, or does the straight input go first like the Priority Merger's first input?
+2. **Cauldron line filling from the end:** one line once filled its last cauldron completely before the others. With even splits, what caused it?
+3. **Heater burn and research:** does a heater's own burn speed up with Factory Efficiency? We assume not (5–9 % fuel difference).
+4. **Thermal Extractor height formula:** starfi5h uses ×1 at height 0 rising to ×3 at height 255. Unverified, not modelled.
+5. **Coins on belts:** can one coin line carry everything, or are coins limited like items? (starfi5h assumes 50× a belt.)
+6. **Seed counts:** seeds a nursery needs are taken from the recipe; unverified.
+7. **Untaught machine layouts:** Shaper, Advanced Shaper and Aether Shaper (front output), Arcane Processor (raised output, Arcane Fountain input), Omni Machine, Paradox Crucible in modules.
+8. **Game data freshness:** reading the game's tables (recipes, items, building data) directly needs a mappings file (`.usmap`, made with UE4SS, see `tools/extract-game-data/README.md`). Only the texts can be read without one.
+9. **3-way belt split:** assumed to share evenly like the 2-way split.
