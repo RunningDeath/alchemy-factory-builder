@@ -46,7 +46,7 @@ function recipeNode(f: RecipeFlows, crafts: number, ctx: EfficiencyContext): Pro
         const heaters = Math.ceil(machines / perHeater - 1e-4);
         node.parentFurnaceId = heater.id;
         node.parentFurnaceCount = heaters;
-        node.heatConsumption = (machines * device.heat_consuming_speed * ctx.speedMultiplier + heaters * (heater.heat_self ?? 0)) * 60;
+        node.heatConsumption = (machines * device.heat_consuming_speed + heaters * (heater.heat_self ?? 0)) * ctx.speedMultiplier * 60;
     }
     return node;
 }

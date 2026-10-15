@@ -99,12 +99,12 @@ export function recipeFlows(recipe: Recipe, ctx: EfficiencyContext, withReserve 
     }
 
     // Heated machines burn fuel while they work, and their heating device burns its own share:
-    // the device's heat over the machines it holds (that part doesn't speed up with research)
+    // the device's heat over the machines it holds. Both speed up with Factory Efficiency
+    // (checked by the player), so per craft neither depends on it
     if (device?.heat_consuming_speed && device.parent) {
         const heater = getDevice(device.parent);
         const share = heater?.heat_self && heater.slots ? (heater.heat_self * (device.slots_required ?? 1)) / heater.slots : 0;
-        const seconds = time / ctx.speedMultiplier;
-        flows.heatPerCraft = device.heat_consuming_speed * time + share * seconds;
+        flows.heatPerCraft = (device.heat_consuming_speed + share) * time;
         const fuelId = normalizeItemId(ctx.selectedFuel);
         const heatValue = getItem(fuelId)?.heat_value;
         if (heatValue) {

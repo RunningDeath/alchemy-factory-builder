@@ -70,9 +70,9 @@ The human-readable version with diagrams is `docs/game-rules.html`. Open questio
   **[Calc]**
 - **Heat per craft:**
   - The machine burns `heat_consuming_speed` × its working time.
-  - Its heater adds its own burn × (slots taken ÷ slots). That share does not speed up with research.
+  - Its heater adds its own burn × (slots taken ÷ slots). That share speeds up with Factory Efficiency too, so per craft neither part depends on research.
   - Fuel = heat ÷ (fuel `heat_value` × Fuel Efficiency).
-  - **[Calc]** (starfi5h), **[Assumed]** for the heater part
+  - **[Calc]**, **[Player]** for the heater part
 - **Heater placement:** heaters cover the machines' own columns and rows, not a fixed grid (3 kilns need 3 stoves, not 6). **[Calc]**
 - **Separated steam pads need a pipe between them** to stay heated. **[Player]**
 - **Self-made fuel for heated chains** is primed by a starter box like fertilizer.
@@ -118,7 +118,7 @@ The human-readable version with diagrams is `docs/game-rules.html`. Open questio
 
 - **Plain belts:** player blueprints only use the plain belt for straight runs, turns, splits and merges. `BaseActiveIndex` holds the connected sides relative to the front (front 1, right 2, back 4, left 8; outputs shifted by 4). **[Blueprint]** (429 belts in 18 blueprints)
 - **Plain belt splits share evenly, whatever the shape:** straight + side, or left + right (a T). **[Player]** (an earlier note said "straight first"; that applies only to the Priority Splitter)
-- **Merge:** the same belt shape with the branch running **into** the line is a merge (two belts in, one out), not a split. What decides split versus merge is the direction of the branch. **[Player]**
+- **Merge:** the same belt shape with the branch running **into** the line is a merge (two belts in, one out), not a split. A plain merge takes from both inputs **alternately, fairly**. What decides split versus merge is the direction of the branch. **[Player]**
 - **Priority Splitter (vertical, 2×1×2):** in on one side, two outputs on the other. The lower output gets **everything first**; the upper only gets items when the lower backs up. Used for "module first, overflow to export". **[Player]**/**[Blueprint]**
 - **Filter Splitter:**
   - Tall version: the filtered item takes the **lower** output.
@@ -180,6 +180,8 @@ Sources here: **[Player]** answers (Oct 2026) and **[Text]**, the game's own Eng
 | Pipes | No throughput or length limit, no direction. A pipe piece is horizontal, or vertical in the X or Y plane. | [Player], [Text] |
 | Catapults, cannons, hoppers | Ignored for now. | [Player] |
 | Priority Merger | Two inputs, one output: items from the **first** input go first. | [Text] |
+| Plain belt merge | Alternates fairly between the two inputs. | [Player] |
+| Heater burn | A heater's own burn speeds up with Factory Efficiency like its machines (the planner now assumes so). | [Player] |
 | Priority Splitter | One input, two outputs: items go to the **first** output first. | [Text] |
 | Balanced Splitter | Splits evenly into two outputs and stops if either output is blocked. It isn't in the build menu (no unlock), so not used. A "Scale" building splits coins or raw materials evenly. | [Text], [Player] |
 | Stone Stove vs Stone Furnace | The game calls our `stone-stove` the **Stone Furnace** (3×3×3, 9 slots), and our `stone-furnace` is the **Blast Furnace** (7×6×3, 42 slots, larger heating area). Both refill fuel from a belt. | [Text], [Data] |
@@ -194,12 +196,9 @@ Sources here: **[Player]** answers (Oct 2026) and **[Text]**, the game's own Eng
 
 ## Still open
 
-1. **Plain belt merge:** when two plain belts join, does it alternate fairly, or does the straight input go first like the Priority Merger's first input?
-2. **Cauldron line filling from the end:** one line once filled its last cauldron completely before the others. With even splits, what caused it?
-3. **Heater burn and research:** does a heater's own burn speed up with Factory Efficiency? We assume not (5–9 % fuel difference).
-4. **Thermal Extractor height formula:** starfi5h uses ×1 at height 0 rising to ×3 at height 255. Unverified, not modelled.
-5. **Coins on belts:** can one coin line carry everything, or are coins limited like items? (starfi5h assumes 50× a belt.)
-6. **Seed counts:** seeds a nursery needs are taken from the recipe; unverified.
-7. **Untaught machine layouts:** Shaper, Advanced Shaper and Aether Shaper (front output), Arcane Processor (raised output, Arcane Fountain input), Omni Machine, Paradox Crucible in modules.
-8. **Game data freshness:** reading the game's tables (recipes, items, building data) directly needs a mappings file (`.usmap`, made with UE4SS, see `tools/extract-game-data/README.md`). Only the texts can be read without one.
-9. **3-way belt split:** assumed to share evenly like the 2-way split.
+1. **Thermal Extractor height formula:** starfi5h uses ×1 at height 0 rising to ×3 at height 255. Unverified, not modelled.
+2. **Coins on belts:** can one coin line carry everything, or are coins limited like items? (starfi5h assumes 50× a belt.)
+3. **Seed counts:** seeds a nursery needs are taken from the recipe; unverified.
+4. **Untaught machine layouts:** Shaper, Advanced Shaper and Aether Shaper (front output), Arcane Processor (raised output, Arcane Fountain input), Omni Machine, Paradox Crucible in modules.
+5. **Game data freshness:** reading the game's tables (recipes, items, building data) directly needs a mappings file (`.usmap`, made with UE4SS, see `tools/extract-game-data/README.md`). Only the texts can be read without one.
+6. **3-way belt split:** assumed to share evenly like the 2-way split.

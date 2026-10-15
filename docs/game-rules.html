@@ -171,7 +171,7 @@
     </div>
     <div class="card">
       <h3>Fuel per craft</h3>
-      <p>Machine heat × working time, plus the heater's own burn × (slots ÷ 9). That heater share doesn't speed up with research. <span class="tag t-ass">Assumed</span> Fuel = heat ÷ (heat value × Fuel Efficiency).</p>
+      <p>Machine heat plus the heater's own burn × (slots ÷ 9), times working time. Both speed up with research, so per craft neither depends on it. <span class="tag t-player">Player</span> Fuel = heat ÷ (heat value × Fuel Efficiency).</p>
     </div>
   </div>
 
@@ -366,6 +366,8 @@
       <tr><td>Pipes</td><td>No limits, no direction; a piece is horizontal or vertical (X or Y plane).</td><td><span class="tag t-player">Player</span></td></tr>
       <tr><td>Catapults, cannons</td><td>Ignored for now.</td><td><span class="tag t-player">Player</span></td></tr>
       <tr><td>Priority Merger</td><td>Items from the first input go first.</td><td><span class="tag t-data">Game text</span></td></tr>
+      <tr><td>Plain belt merge</td><td>Alternates fairly between both inputs.</td><td><span class="tag t-player">Player</span></td></tr>
+      <tr><td>Heater burn</td><td>Speeds up with research like its machines.</td><td><span class="tag t-player">Player</span></td></tr>
       <tr><td>Priority Splitter</td><td>Items go to the first output first.</td><td><span class="tag t-data">Game text</span></td></tr>
       <tr><td>Balanced Splitter</td><td>Splits evenly, stops if an output is blocked; not in the build menu.</td><td><span class="tag t-data">Game text</span></td></tr>
       <tr><td>Furnaces</td><td>Our "stove" is the game's Stone Furnace (9 slots); our "furnace" is the Blast Furnace (7×6×3, 42 slots).</td><td><span class="tag t-data">Game text</span></td></tr>
@@ -377,9 +379,6 @@
   <h3>Still open</h3>
   <div class="card unknown">
     <ul>
-      <li><span class="prio">High</span><b>Plain belt merge</b>: fair alternation, or does the straight input go first?</li>
-      <li><span class="prio">High</span><b>Cauldron line filling from the end</b>: what caused it, if splits are even?</li>
-      <li><span class="prio">Medium</span><b>Heater burn with research</b>: does a heater's own burn speed up? (assumed not)</li>
       <li><span class="prio">Medium</span><b>Untaught machines</b>: Shaper family (front output), Arcane Processor, Omni Machine, Paradox Crucible in modules.</li>
       <li><span class="prio">Low</span><b>Thermal Extractor height formula</b>, <b>coins on belts</b>, <b>seed counts</b>, <b>3-way split</b>: unverified.</li>
       <li><span class="prio">Low</span><b>Game data</b>: the game's tables need a mappings file (<code>.usmap</code>) to read; texts don't.</li>
