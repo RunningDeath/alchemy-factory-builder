@@ -270,9 +270,8 @@ describe("separate inputs, filters and heating", () => {
     expect(mod.routes.filter((r) => r.itemName === "Iron Ore" && r.to.includes("export"))).toEqual([]);
   });
 
-  test("pipes share a cell with a lab stand only where they run straight", () => {
-    // In game a lab stand can't stand over a pipe bend
-    const opposite: Record<string, string> = { left: "right", right: "left", up: "down", down: "up", top: "base", base: "top" };
+  test("pipes share a cell with a lab stand only where they stay on their level", () => {
+    // In game a lab stand stands over pipes bending across, not over one going up or down
     for (const machines of [2, 4, 6, 9]) {
       const mod = generateModule(
         [
@@ -291,8 +290,7 @@ describe("separate inputs, filters and heating", () => {
       );
       const stands = new Set(mod.placements.filter((p) => p.id === "frame-single").map((p) => `${p.x},${p.y},${p.z}`));
       for (const pipe of mod.placements.filter((p) => p.id === "pipe" && stands.has(`${p.x},${p.y},${p.z}`))) {
-        const sides = pipe.pipeSides ?? [];
-        expect(sides.length <= 1 || (sides.length === 2 && opposite[sides[0]] === sides[1])).toBe(true);
+        expect((pipe.pipeSides ?? []).filter((s) => s === "top" || s === "base")).toEqual([]);
       }
     }
   });

@@ -56,7 +56,9 @@ export type LayoutIssue =
     | { kind: "collision"; uid: string; other: string; cell: [number, number, number] }
     | { kind: "unsupported"; uid: string; cell: [number, number, number] }
     /** Heated machines must be built on a heating device ("Can only be built on heating devices") */
-    | { kind: "unheated"; uid: string };
+    | { kind: "unheated"; uid: string }
+    /** A pipe goes up or down in a lab stand's cell: a lab stand only stands over a pipe that stays on its level */
+    | { kind: "pipe-under-stand"; uid: string };
 
 export const cellKey = (x: number, y: number, z: number) => `${x},${y},${z}`;
 
@@ -128,6 +130,10 @@ export function placementIssues(p: Placement, occupancy: Map<string, WorldCell[]
             .filter((c) => c.z === bottom && c.foundation)
             .every((c) => (occupancy.get(cellKey(c.x, c.y, c.z - 1)) ?? []).some((b) => b.uid !== p.uid && heatsFrom(b.id)));
         if (!heated) issues.push({ kind: "unheated", uid: p.uid });
+    }
+    // A lab stand can't stand over a pipe going up or down (checked in game)
+    if (p.id === "pipe" && p.pipeSides?.some((s) => s === "top" || s === "base") && (occupancy.get(cellKey(p.x, p.y, p.z)) ?? []).some((o) => o.id === "frame-single")) {
+        issues.push({ kind: "pipe-under-stand", uid: p.uid });
     }
     return issues;
 }

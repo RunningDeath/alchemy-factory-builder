@@ -1743,8 +1743,9 @@ function routeAndFinish(
         for (const item of fuels) routed.placements = placeStarterBox(routed.placements, item, options.maxHeight, () => nextUid("sb"), (p) => p.id === STOVE_ID);
         // Rows and columns that only pass belts straight through go before the supports get cheaper
         const compact = removeStraightLines({ placements: routed.placements, io: routed.io, tiers });
-        // Pipe networks through what the belts left free, before supports fill any of it
-        routed.placements = finishSupports(layPipes(compact.placements, options.maxHeight, () => nextUid("pp")), can);
+        // Pipe networks through what the belts left free, before supports fill any of it; the
+        // supports nothing rests on go first, so their lab stands don't stop pipes going up or down
+        routed.placements = finishSupports(layPipes(pruneSupports(compact.placements), options.maxHeight, () => nextUid("pp")), can);
         routed.io = compact.io;
         tiers = compact.tiers;
     }

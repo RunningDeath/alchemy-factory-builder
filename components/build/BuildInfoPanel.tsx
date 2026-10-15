@@ -27,6 +27,7 @@ const ISSUE_TEXT: Record<LayoutIssue["kind"], string> = {
     underground: "is below the ground",
     unknown: "unknown building",
     unheated: "needs a heating device under it",
+    "pipe-under-stand": "goes up or down under a lab stand (move the stand or the pipe)",
 };
 
 const DISPOSAL_LABEL = { altar: "Into a knowledge altar", trash: "Into a trash barrel", sell: "Sold at a dispatch portal" } as const;

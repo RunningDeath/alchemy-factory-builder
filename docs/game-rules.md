@@ -132,7 +132,7 @@ The human-readable version with diagrams is `docs/game-rules.html`. Open questio
   - Exactly **one** per primed item, in the fertilizer (or fuel) back flow, at the module's **outline** where the player reaches it. **[Player]**
   - Colored **red** in game (`CustomColor` BGRA 64, 64, 255, 255) and in the app. **[Player]**/**[Blueprint]**
 - **Pipes:**
-  - They need **free cells** (they can't pass through wood blocks) but **no support**. A lab stand may share a cell with a pipe only where the pipe runs **straight**, never at a bend or branch. **[Player]**
+  - They need **free cells** (they can't pass through wood blocks) but **no support**. A lab stand may share a cell with a pipe as long as the pipe **stays on its level** (straight or bending across); not where the pipe goes **up or down**. **[Player]**
   - **One pipe input per resource:** the module's ports join at the **lowest possible line**, with one riser from the middle up to the top. **[Player]**
   - Pipes are colored per resource.
   - Plain pipe `BaseActiveIndex`: side bits like belts, plus 16 down, 32 up. **[Blueprint]**

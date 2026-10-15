@@ -109,39 +109,17 @@ const MAX_DIRECT_PIPE = 6;
  * The pipe networks for a routed layout (its pipe placeholders are replaced): per fluid, the
  * ports join through free cells, low ones first; see the file comment
  */
-/** Rounds of laying the pipes again around lab stands a pipe bent in */
-const STRAIGHT_RETRIES = 6;
-
-/** No bend and no branch: at most two sides, and two only when they face each other */
-function isStraight(sides: Set<Side | VerticalFace>): boolean {
-    const list = [...sides];
-    return list.length <= 1 || (list.length === 2 && opposite(list[0]) === list[1]);
-}
-
-/**
- * A pipe shares a cell with a lab stand only where it runs straight (checked in game: a lab
- * stand can't stand over a bend). Laid again with every cell where a pipe bent under a lab
- * stand blocked, until none is left.
- */
 export function layPipes(input: Placement[], maxHeight: number, makeUid: () => string): Placement[] {
     const placements = input.filter((p) => p.id !== PIPE_ID);
     const occupancy = buildOccupancy(placements);
-    const avoid = new Set<string>();
-    let result = layPipesOnce(placements, occupancy, maxHeight, makeUid, avoid);
-    for (let round = 0; round < STRAIGHT_RETRIES; round++) {
-        const bent = result.pipes.filter((p) => occupancy.has(key(p.x, p.y, p.z)) && !isStraight(new Set(p.pipeSides)));
-        if (!bent.length) break;
-        bent.forEach((p) => avoid.add(key(p.x, p.y, p.z)));
-        result = layPipesOnce(placements, occupancy, maxHeight, makeUid, avoid);
-    }
-    return [...placements, ...result.pipes];
-}
-
-function layPipesOnce(placements: Placement[], occupancy: ReturnType<typeof buildOccupancy>, maxHeight: number, makeUid: () => string, avoid: Set<string>): { pipes: Placement[] } {
     const cells = new Map<string, { resource: string; sides: Set<Side | VerticalFace> }>();
-    // A pipe shares a cell with what leaves it room (a lab stand, straight pipes only), not with a wood block or belt
+    // A pipe shares a cell with what leaves it room (a lab stand), not with a wood block or belt
     const pipeCell = footprintCells(getFootprint(PIPE_ID)!)[0];
-    const blocked = (x: number, y: number, z: number) => avoid.has(key(x, y, z)) || !!occupancy.get(key(x, y, z))?.some((c) => cellsCollide(c, pipeCell));
+    const blocked = (x: number, y: number, z: number) => !!occupancy.get(key(x, y, z))?.some((c) => cellsCollide(c, pipeCell));
+    // A lab stand stands over a pipe that stays on its level (straight or bending across), not
+    // over one that goes up or down (checked in game): no vertical step into or out of its cell
+    const shared = (x: number, y: number, z: number) => occupancy.has(key(x, y, z)) && !blocked(x, y, z);
+    const verticalOk = (a: Cell, b: Cell) => a[2] === b[2] || (!shared(...a) && !shared(...b));
     const ports = pipePorts(placements, (x, y, z) => !blocked(x, y, z));
     const all = [...occupancy.keys()].map((k) => k.split(",").map(Number));
     const bounds = {
@@ -164,7 +142,7 @@ function layPipesOnce(placements: Placement[], occupancy: ReturnType<typeof buil
         cells.get(key(...b))!.sides.add(opposite(step[3]));
     };
     /** Cheapest way from `from` to any cell of `targets`, through free cells; height costs a little */
-    const route = (from: Cell, targets: Set<string>, resource: string): Cell[] | null => {
+    const route = (from: Cell, targets: Set<string>, resource: string, strict = true): Cell[] | null => {
         const usable = (x: number, y: number, z: number) => {
             if (x < bounds.minX || x > bounds.maxX || y < bounds.minY || y > bounds.maxY || z < 0 || z > top) return false;
             const cell = cells.get(key(x, y, z));
@@ -187,6 +165,7 @@ function layPipesOnce(placements: Placement[], occupancy: ReturnType<typeof buil
                     const n: Cell = [c[0] + dx, c[1] + dy, c[2] + dz];
                     const nk = key(...n);
                     if (!targets.has(nk) && !usable(...n)) continue;
+                    if (strict && !verticalOk(c, n)) continue;
                     // Up costs more than across: networks stay low
                     const cost = d + (dz > 0 ? 3 : 1);
                     if (cost >= (dist.get(nk) ?? Infinity)) continue;
@@ -207,7 +186,9 @@ function layPipesOnce(placements: Placement[], occupancy: ReturnType<typeof buil
         const tree = new Set([key(list[0].x, list[0].y, list[0].z)]);
         for (const port of list.slice(1)) {
             if (tree.has(key(port.x, port.y, port.z))) continue;
-            const path = route([port.x, port.y, port.z], tree, resource);
+            // Where only a way up or down through a lab stand is left, take it: the layout check
+            // flags it ("pipe-under-stand") for the player to move the stand
+            const path = route([port.x, port.y, port.z], tree, resource) ?? route([port.x, port.y, port.z], tree, resource, false);
             if (!path) continue;
             path.forEach((c, i) => {
                 add(c, resource);
@@ -231,12 +212,12 @@ function layPipesOnce(placements: Placement[], occupancy: ReturnType<typeof buil
                 }
                 const column: Cell[] = [];
                 for (let z = start[2]; z <= top; z++) column.push([start[0], start[1], z]);
-                if (column.slice(1).every((c) => !blocked(...c) && (!cells.get(key(...c)) || cells.get(key(...c))!.resource === resource))) {
+                if (column.every((c, i) => i === 0 || (!blocked(...c) && (!cells.get(key(...c)) || cells.get(key(...c))!.resource === resource) && verticalOk(column[i - 1], c)))) {
                     up = column;
                     break;
                 }
             }
-            up ??= route(net[0], topCells, resource);
+            up ??= route(net[0], topCells, resource) ?? route(net[0], topCells, resource, false);
             up?.forEach((c, i) => {
                 add(c, resource);
                 if (i > 0) link(up![i - 1], c);
@@ -247,5 +228,5 @@ function layPipesOnce(placements: Placement[], occupancy: ReturnType<typeof buil
         const [x, y, z] = k.split(",").map(Number);
         return { uid: makeUid(), id: PIPE_ID, x, y, z, rot: 0, pipeSides: [...cell.sides], label: cell.resource };
     });
-    return { pipes };
+    return [...placements, ...pipes];
 }
