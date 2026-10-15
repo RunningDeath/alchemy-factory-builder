@@ -132,7 +132,7 @@ The human-readable version with diagrams is `docs/game-rules.html`. Open questio
   - Exactly **one** per primed item, in the fertilizer (or fuel) back flow, at the module's **outline** where the player reaches it. **[Player]**
   - Colored **red** in game (`CustomColor` BGRA 64, 64, 255, 255) and in the app. **[Player]**/**[Blueprint]**
 - **Pipes:**
-  - They need **free cells** (they can't pass through wood blocks) but **no support**. Lab stands may sit above pipes. **[Player]**
+  - They need **free cells** (they can't pass through wood blocks) but **no support**. A lab stand may share a cell with a pipe only where the pipe runs **straight**, never at a bend or branch. **[Player]**
   - **One pipe input per resource:** the module's ports join at the **lowest possible line**, with one riser from the middle up to the top. **[Player]**
   - Pipes are colored per resource.
   - Plain pipe `BaseActiveIndex`: side bits like belts, plus 16 down, 32 up. **[Blueprint]**
@@ -156,7 +156,7 @@ The human-readable version with diagrams is `docs/game-rules.html`. Open questio
 - **Same kinds together:** stacks don't mix machine kinds without need. **[Player]**
 - **Termination:** generation must finish; effort is counted in routing steps (deterministic: the same plan gives the same module). **[Player]**/PR #4
 - **Feed evenly** wherever several machines start from the same supply, above all for starter-primed items. **[Player]**
-- **Splitting at the end of a chain** happens behind the construct where there is free space, not at the output. **[Player]**
+- **Splits at the end of a chain** (e.g. the Growth Potion output dividing into export and the fertilizer back flow) go where there is free room behind the module, not crammed right at the machines' outputs. **[Player]** (the router may place a priority splitter up to 3 cells away from its exit, `SPLITTER_LEAD`)
 
 ## 10. Blueprint file format
 

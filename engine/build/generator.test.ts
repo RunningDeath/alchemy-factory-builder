@@ -270,6 +270,33 @@ describe("separate inputs, filters and heating", () => {
     expect(mod.routes.filter((r) => r.itemName === "Iron Ore" && r.to.includes("export"))).toEqual([]);
   });
 
+  test("pipes share a cell with a lab stand only where they run straight", () => {
+    // In game a lab stand can't stand over a pipe bend
+    const opposite: Record<string, string> = { left: "right", right: "left", up: "down", down: "up", top: "base", base: "top" };
+    for (const machines of [2, 4, 6, 9]) {
+      const mod = generateModule(
+        [
+          step({
+            deviceId: "athanor",
+            machines,
+            inputs: [
+              { itemName: "Iron Ingot", perMachineRate: 20 },
+              { itemName: "Coke Powder", perMachineRate: 20 },
+            ],
+            outputs: [{ itemName: "Steel Ingot", perMachineRate: 20 }],
+            heating: { kind: "steam", fuelItem: "Steam", fuelRate: 60 },
+          }),
+        ],
+        options,
+      );
+      const stands = new Set(mod.placements.filter((p) => p.id === "frame-single").map((p) => `${p.x},${p.y},${p.z}`));
+      for (const pipe of mod.placements.filter((p) => p.id === "pipe" && stands.has(`${p.x},${p.y},${p.z}`))) {
+        const sides = pipe.pipeSides ?? [];
+        expect(sides.length <= 1 || (sides.length === 2 && opposite[sides[0]] === sides[1])).toBe(true);
+      }
+    }
+  });
+
   test("steam heating: two-input machines on the platform get supported stub lifts and fed heaters", () => {
     // Athanors stand one level up on their heaters; the lifts down into their second input need support
     for (const machines of [2, 4, 6]) {

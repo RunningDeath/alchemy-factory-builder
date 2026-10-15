@@ -109,13 +109,39 @@ const MAX_DIRECT_PIPE = 6;
  * The pipe networks for a routed layout (its pipe placeholders are replaced): per fluid, the
  * ports join through free cells, low ones first; see the file comment
  */
+/** Rounds of laying the pipes again around lab stands a pipe bent in */
+const STRAIGHT_RETRIES = 6;
+
+/** No bend and no branch: at most two sides, and two only when they face each other */
+function isStraight(sides: Set<Side | VerticalFace>): boolean {
+    const list = [...sides];
+    return list.length <= 1 || (list.length === 2 && opposite(list[0]) === list[1]);
+}
+
+/**
+ * A pipe shares a cell with a lab stand only where it runs straight (checked in game: a lab
+ * stand can't stand over a bend). Laid again with every cell where a pipe bent under a lab
+ * stand blocked, until none is left.
+ */
 export function layPipes(input: Placement[], maxHeight: number, makeUid: () => string): Placement[] {
     const placements = input.filter((p) => p.id !== PIPE_ID);
     const occupancy = buildOccupancy(placements);
+    const avoid = new Set<string>();
+    let result = layPipesOnce(placements, occupancy, maxHeight, makeUid, avoid);
+    for (let round = 0; round < STRAIGHT_RETRIES; round++) {
+        const bent = result.pipes.filter((p) => occupancy.has(key(p.x, p.y, p.z)) && !isStraight(new Set(p.pipeSides)));
+        if (!bent.length) break;
+        bent.forEach((p) => avoid.add(key(p.x, p.y, p.z)));
+        result = layPipesOnce(placements, occupancy, maxHeight, makeUid, avoid);
+    }
+    return [...placements, ...result.pipes];
+}
+
+function layPipesOnce(placements: Placement[], occupancy: ReturnType<typeof buildOccupancy>, maxHeight: number, makeUid: () => string, avoid: Set<string>): { pipes: Placement[] } {
     const cells = new Map<string, { resource: string; sides: Set<Side | VerticalFace> }>();
-    // A pipe shares a cell with what leaves it room (a lab stand), not with a wood block or belt
+    // A pipe shares a cell with what leaves it room (a lab stand, straight pipes only), not with a wood block or belt
     const pipeCell = footprintCells(getFootprint(PIPE_ID)!)[0];
-    const blocked = (x: number, y: number, z: number) => !!occupancy.get(key(x, y, z))?.some((c) => cellsCollide(c, pipeCell));
+    const blocked = (x: number, y: number, z: number) => avoid.has(key(x, y, z)) || !!occupancy.get(key(x, y, z))?.some((c) => cellsCollide(c, pipeCell));
     const ports = pipePorts(placements, (x, y, z) => !blocked(x, y, z));
     const all = [...occupancy.keys()].map((k) => k.split(",").map(Number));
     const bounds = {
@@ -221,5 +247,5 @@ export function layPipes(input: Placement[], maxHeight: number, makeUid: () => s
         const [x, y, z] = k.split(",").map(Number);
         return { uid: makeUid(), id: PIPE_ID, x, y, z, rot: 0, pipeSides: [...cell.sides], label: cell.resource };
     });
-    return [...placements, ...pipes];
+    return { pipes };
 }
