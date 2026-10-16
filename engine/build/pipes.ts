@@ -44,7 +44,8 @@ const opposite = (side: Side | VerticalFace): Side | VerticalFace => (side === "
 /** The pipe ports needing a pipe: a steam heater needs one of its two sides, other machines every pipe port */
 function pipePorts(placements: Placement[], cellFree: (x: number, y: number, z: number) => boolean): PipePort[] {
     const ports: PipePort[] = [];
-    const heaters: PipePort[][] = [];
+    /** Per heater chain: the ports any of its heaters could take the steam at */
+    const heaters = new Map<string, PipePort[]>();
     for (const p of placements) {
         const fp = getFootprint(p.id);
         if (!fp || (fp.category !== "production" && fp.category !== "heating")) continue;
@@ -64,12 +65,14 @@ function pipePorts(placements: Placement[], cellFree: (x: number, y: number, z: 
             options.push({ resource, kind, x: q.x + dx, y: q.y + dy, z: q.z, toward: oppositeSide(face) });
         }
         const usable = options.filter((o) => cellFree(o.x, o.y, o.z));
-        if (p.id === "steam-heater") heaters.push(usable);
-        else ports.push(...usable);
+        if (p.id === "steam-heater") {
+            const chain = p.pipeEnd?.chain ?? p.uid;
+            heaters.set(chain, [...(heaters.get(chain) ?? []), ...usable]);
+        } else ports.push(...usable);
     }
-    // A heater takes the side nearest another port of its fluid: two heaters face each other
-    for (const options of heaters) {
-        const others = [...ports, ...heaters.filter((o) => o !== options).flat()].filter((o) => o.resource === options[0]?.resource);
+    // A chain takes the free side nearest another port of its fluid: two chains face each other
+    for (const options of heaters.values()) {
+        const others = [...ports, ...[...heaters.values()].filter((o) => o !== options).flat()].filter((o) => o.resource === options[0]?.resource);
         const near = (o: PipePort) => Math.min(Infinity, ...others.map((q) => Math.abs(q.x - o.x) + Math.abs(q.y - o.y) + Math.abs(q.z - o.z)));
         const best = [...options].sort((a, b) => near(a) - near(b))[0];
         if (best) ports.push(best);

@@ -16,6 +16,7 @@ import type { GenerateMessage, GenerateRequest } from "./generate.worker";
 import { ItemLegend } from "./ItemLegend";
 import { useFactoryStore } from "../../store/useFactoryStore";
 import { BuildInfoPanel } from "./BuildInfoPanel";
+import { moduleIssues as findModuleIssues } from "../../engine/build/checks";
 import { BuildPalette } from "./BuildPalette";
 import { BuildToolbar, type BuildViewMode } from "./BuildToolbar";
 import { LayerGrid, type BuildTool } from "./LayerGrid";
@@ -97,6 +98,8 @@ export function BuildPlanner() {
 
     const occupancy = useMemo(() => buildOccupancy(placements), [placements]);
     const issues = useMemo(() => placements.flatMap((p) => placementIssues(p, occupancy)), [placements, occupancy]);
+    // Steam reaching every heater, belts carrying only what their machines take
+    const moduleIssues = useMemo(() => findModuleIssues(placements, layout?.io ?? []), [placements, layout?.io]);
     const issuesByUid = useMemo(() => {
         const map = new Map<string, LayoutIssue[]>();
         issues.forEach((i) => map.set(i.uid, [...(map.get(i.uid) ?? []), i]));
@@ -452,6 +455,7 @@ export function BuildPlanner() {
                     <BuildInfoPanel
                         placements={placements}
                         issues={issues}
+                        moduleIssues={moduleIssues}
                         ports={ports}
                         tiers={layout?.tiers ?? []}
                         routes={layout?.routes ?? []}

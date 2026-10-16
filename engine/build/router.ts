@@ -30,6 +30,8 @@ export interface LaneEnd {
     /** in: direction from the port cell into the lane; out: direction from the lane into the port cell */
     dir: Side;
     block?: number;
+    /** A fail product its own block takes again (see Placement.laneEnd) */
+    loop?: boolean;
 }
 
 export interface RouteResult {
@@ -40,6 +42,8 @@ export interface RouteResult {
     ok: boolean;
     /** Why a connection failed: no usable start cell, no way through free cells, the search ran out of steps, or the path found couldn't be built */
     reason?: "no-start" | "no-way" | "search-limit" | "commit";
+    /** A fail product back into its block without a priority merger (no room): new items can crowd it out and stop the machines */
+    unprioritized?: boolean;
     /** Identifies the connection across routing passes */
     key?: string;
 }
@@ -92,6 +96,8 @@ export interface RouterOptions {
 }
 
 const PRIORITY_SPLITTER = "splitter-vert";
+/** Priority mergers, flat ones first: output, then the priority input (gold in game), then the other */
+const PRIORITY_MERGERS = ["merger", "merger-sym", "merger-vert"];
 /** Routing passes per layout: failed connections first in each next one */
 const ROUTE_PASSES = 6;
 /** Most cells a later pass adds to a connection's distance to vary the order */
@@ -149,6 +155,7 @@ function rotFor(base: Side, want: Side): Rotation {
 
 const add = (c: Cell, s: Side): Cell => [c[0] + SIDE_OFFSET[s][0], c[1] + SIDE_OFFSET[s][1], c[2]];
 const keyOf = (c: Cell) => cellKey(c[0], c[1], c[2]);
+const SIDE_INDEX = Object.fromEntries(SIDES.map((side, i) => [side, i])) as Record<Side, number>;
 
 /** Open ends of generated lanes */
 export function findLaneEnds(placements: Placement[]): LaneEnd[] {
@@ -163,7 +170,7 @@ export function findLaneEnds(placements: Placement[]): LaneEnd[] {
         if (p.laneEnd.kind === "out" && s.port.dir !== "out") continue;
         const port = portTarget(s.port) as Cell;
         const dir = p.laneEnd.kind === "in" ? oppositeSide(s.port.face) : s.port.face;
-        ends.push({ uid: p.uid, kind: p.laneEnd.kind, items: p.laneEnd.items, port, dir, block: p.block });
+        ends.push({ uid: p.uid, kind: p.laneEnd.kind, items: p.laneEnd.items, port, dir, block: p.block, ...(p.laneEnd.loop && { loop: true }) });
     }
     return ends;
 }
@@ -177,6 +184,10 @@ interface Connection {
     dispose?: boolean;
     /** Surplus belted to a consumer that won't take it all: doesn't count against the belt's room */
     surplus?: boolean;
+    /** A fail product back into its own block (see LaneEnd.loop) */
+    loop?: boolean;
+    /** That loop shares its entry without a priority merger */
+    unprioritized?: boolean;
 }
 
 /** Match producers to consumers per item; the rest is imported or exported */
@@ -474,6 +485,33 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
     };
     const liftFree = (c: Cell) => inBounds(c) && !nodes.has(keyOf(c)) && !reserved.has(keyOf(c)) && (occupancy.get(keyOf(c)) ?? []).length === 0;
 
+    // Per-search caches over the routing area: nothing a search looks at changes while it
+    // runs, so each cell is checked once, by number instead of "x,y,z" key. Stamped, so a new
+    // search starts empty without clearing
+    const sizeX = maxX - minX + 1;
+    const sizeY = maxY - minY + 1;
+    const cellCount = sizeX * sizeY * (maxZ + 1);
+    const cellIndex = (c: Cell) => (c[2] * sizeY + (c[1] - minY)) * sizeX + (c[0] - minX);
+    let searchStamp = 0;
+    const cache = () => ({ stamp: new Int32Array(cellCount), value: new Float64Array(cellCount) });
+    const beltFreeCache = cache();
+    const liftFreeCache = cache();
+    const supportCache = cache();
+    const besideCache = cache();
+    const bestStamp = new Int32Array(cellCount * 4);
+    const bestCost = new Float64Array(cellCount * 4);
+    /** A cell's cached value, computed on first use in this search (cells inside the area only) */
+    const cached = (store: ReturnType<typeof cache>, c: Cell, compute: () => number) => {
+        const i = cellIndex(c);
+        if (store.stamp[i] === searchStamp) return store.value[i];
+        const v = compute();
+        store.stamp[i] = searchStamp;
+        store.value[i] = v;
+        return v;
+    };
+    const beltFreeNow = (c: Cell) => inBounds(c) && cached(beltFreeCache, c, () => (beltFree(c) ? 1 : 0)) === 1;
+    const liftFreeNow = (c: Cell) => inBounds(c) && cached(liftFreeCache, c, () => (liftFree(c) ? 1 : 0)) === 1;
+
     const endName = (e: LaneEnd | "import" | "export") =>
         e === "import" ? "module edge (import)" : e === "export" ? "module edge (export)" : options.blockNames[e.block ?? -1] ?? "block";
 
@@ -489,32 +527,54 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
     let lastFailure: RouteResult["reason"];
     function search(starts: Start[], goal: (cell: Cell, heading: Side) => Goal | null, estimate: (c: Cell) => number, levels: number[]): { end: SearchNode; goal: Goal } | null {
         const open = new Heap();
-        const best = new Map<string, number>();
+        searchStamp++;
         lastFailure = "no-start";
         const h = (c: Cell) => estimate(c) * 1.5;
-        const supportMemo = new Map<string, number | null>();
-        const supports = (c: Cell) => {
-            const k = keyOf(c);
-            if (!supportMemo.has(k)) supportMemo.set(k, supportCost(occupancy, c[0], c[1], c[2]));
-            return supportMemo.get(k)!;
+        // Lowest cost found per cell and heading
+        const bestOutside = new Map<string, number>();
+        const bestOf = (c: Cell, heading: Side) => {
+            if (!inBounds(c)) return bestOutside.get(keyOf(c) + ":" + heading) ?? Infinity;
+            const i = cellIndex(c) * 4 + SIDE_INDEX[heading];
+            return bestStamp[i] === searchStamp ? bestCost[i] : Infinity;
         };
-        const beltCost = (c: Cell, turned: boolean) => {
-            const s = supports(c);
-            if (s === null) return null;
-            // Running next to another belt (routed or a block lane) keeps belts bundled instead of spread out
-            const besideBelt = SIDES.some((side) => {
+        const setBest = (c: Cell, heading: Side, g: number) => {
+            if (!inBounds(c)) {
+                bestOutside.set(keyOf(c) + ":" + heading, g);
+                return;
+            }
+            const i = cellIndex(c) * 4 + SIDE_INDEX[heading];
+            bestStamp[i] = searchStamp;
+            bestCost[i] = g;
+        };
+        const supportOutside = new Map<string, number | null>();
+        const supports = (c: Cell): number | null => {
+            if (!inBounds(c)) {
+                const k = keyOf(c);
+                if (!supportOutside.has(k)) supportOutside.set(k, supportCost(occupancy, c[0], c[1], c[2]));
+                return supportOutside.get(k)!;
+            }
+            const v = cached(supportCache, c, () => supportCost(occupancy, c[0], c[1], c[2]) ?? NaN);
+            return Number.isNaN(v) ? null : v;
+        };
+        const besideBeltAt = (c: Cell) =>
+            SIDES.some((side) => {
                 const n = add(c, side);
                 const routed = nodes.get(keyOf(n));
                 if (routed) return !routed.lift;
                 return (occupancy.get(keyOf(n)) ?? []).some((o) => o.id.startsWith("belt"));
             });
+        const beltCost = (c: Cell, turned: boolean) => {
+            const s = supports(c);
+            if (s === null) return null;
+            // Running next to another belt (routed or a block lane) keeps belts bundled instead of spread out
+            const besideBelt = inBounds(c) ? cached(besideCache, c, () => (besideBeltAt(c) ? 1 : 0)) === 1 : besideBeltAt(c);
             const outward = (Math.abs(c[0] - centerX) + Math.abs(c[1] - centerY)) * 0.03;
             return 1 + (turned ? 0.3 : 0) + s * SUPPORT_WEIGHT + c[2] * 0.3 - (besideBelt ? 0.35 : 0) + outward;
         };
 
         for (const s of starts) {
-            if (!s.branchFrom && !beltFree(s.cell)) continue;
-            if (s.branchFrom && !beltFree(s.cell)) continue;
+            if (!s.branchFrom && !beltFreeNow(s.cell)) continue;
+            if (s.branchFrom && !beltFreeNow(s.cell)) continue;
             for (const heading of SIDES) {
                 if (heading === s.inSide) continue;
                 const base = beltCost(s.cell, heading !== oppositeSide(s.inSide));
@@ -534,15 +594,14 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
             if (searchSteps >= workLimit) break;
             searchSteps++;
             const cur = open.pop();
-            const stateKey = `${keyOf(cur.cell)}:${cur.heading}`;
-            if ((best.get(stateKey) ?? Infinity) <= cur.g - 1e-9) continue;
-            best.set(stateKey, cur.g);
+            if (bestOf(cur.cell, cur.heading) <= cur.g - 1e-9) continue;
+            setBest(cur.cell, cur.heading, cur.g);
 
             const n = add(cur.cell, cur.heading);
             const inSide = oppositeSide(cur.heading);
 
             // Belt into the next cell, going straight or turning
-            if (beltFree(n)) {
+            if (beltFreeNow(n)) {
                 for (const heading of [cur.heading, rotateSide(cur.heading, 1), rotateSide(cur.heading, 3)]) {
                     const cost = beltCost(n, heading !== cur.heading);
                     if (cost === null) continue;
@@ -550,13 +609,12 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
                     node.f = node.g + h(n);
                     const g = goal(n, heading);
                     if (g) return { end: node, goal: g };
-                    const k = `${keyOf(n)}:${heading}`;
-                    if ((best.get(k) ?? Infinity) > node.g) open.push(node);
+                    if (bestOf(n, heading) > node.g) open.push(node);
                 }
             }
 
             // Bridge: anchor in the next cell, deck straight ahead over whatever is below
-            if (options.bridges && cur.step.kind === "belt" && beltFree(n)) {
+            if (options.bridges && cur.step.kind === "belt" && beltFreeNow(n)) {
                 const cells = bridgeCells(n, cur.heading);
                 const postFree = Array.from({ length: BRIDGE_POST }, (_, i): Cell => [n[0], n[1], n[2] + i]).every(
                     (c) => inBounds(c) && !reserved.has(keyOf(c)) && !nodes.has(keyOf(c)) && (occupancy.get(keyOf(c)) ?? []).every((o) => (o.layers & 7) === 0),
@@ -564,7 +622,7 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
                 const support = supports(n);
                 // A bridge only pays where plain belts would need supports under them (up in the air)
                 const saves = n[2] > 0 && cells.slice(1).some((c) => (supports(c) ?? 1) > 0);
-                if (saves && postFree && support !== null && cells.slice(1).every((c) => beltFree(c))) {
+                if (saves && postFree && support !== null && cells.slice(1).every((c) => beltFreeNow(c))) {
                     const last = cells[cells.length - 1];
                     const node: SearchNode = {
                         cell: last,
@@ -575,19 +633,18 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
                         step: { kind: "bridge", anchor: n, heading: cur.heading },
                     };
                     node.f = node.g + h(last);
-                    const k = `${keyOf(last)}:${cur.heading}`;
-                    if ((best.get(k) ?? Infinity) > node.g) open.push(node);
+                    if (bestOf(last, cur.heading) > node.g) open.push(node);
                 }
             }
 
             // Lift up or down from the next cell
-            if (options.lifts !== false && liftFree(n) && cur.step.kind === "belt") {
+            if (options.lifts !== false && liftFreeNow(n) && cur.step.kind === "belt") {
                 for (const z2 of levels) {
                     if (z2 === n[2]) continue;
                     const lo = Math.min(z2, n[2]);
                     const hi = Math.max(z2, n[2]);
                     let free = true;
-                    for (let z = lo; z <= hi && free; z++) free = liftFree([n[0], n[1], z]);
+                    for (let z = lo; z <= hi && free; z++) free = liftFreeNow([n[0], n[1], z]);
                     if (!free) continue;
                     const support = supports([n[0], n[1], lo]);
                     if (support === null) continue;
@@ -596,8 +653,7 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
                         const cost = LIFT_COST + (hi - lo) * 1.5 + support * SUPPORT_WEIGHT;
                         const node: SearchNode = { cell: top, heading, g: cur.g + cost, f: 0, parent: cur, step: { kind: "lift", entry: n, exitZ: z2, inSide, outSide: heading } };
                         node.f = node.g + h(top);
-                        const k = `${keyOf(top)}:${heading}`;
-                        if ((best.get(k) ?? Infinity) > node.g) open.push(node);
+                        if (bestOf(top, heading) > node.g) open.push(node);
                     }
                 }
             }
@@ -787,6 +843,60 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
         return null;
     }
 
+    /**
+     * A priority merger in front of an entry: its priority input (gold in game) takes the
+     * loop, the other one everything else. The flat merger first, in both mirror forms (it
+     * stays on the entry's level, clear of a second input lane above), then the tall one.
+     * Right at the entry if it fits, else a few cells back, a straight belt leading on
+     */
+    function priorityMerger(entry: LaneEnd, itemName: string) {
+        const dir = entry.dir;
+        const back = oppositeSide(dir);
+        const own = new Set([keyOf(entry.port), keyOf(approach(entry))]);
+        const othersEnds = new Set(ends.filter((e) => e !== entry).flatMap((e) => [keyOf(e.port), keyOf(approach(e))]));
+        const free = (c: Cell) => inBounds(c) && !nodes.has(keyOf(c)) && (own.has(keyOf(c)) || (!reserved.has(keyOf(c)) && !othersEnds.has(keyOf(c)))) && (occupancy.get(keyOf(c)) ?? []).every((o) => (o.layers & 7) === 0);
+        const rot = rotFor("left", dir);
+        for (let lead = 0; lead <= SPLITTER_LEAD; lead++) {
+            const leadCells: Cell[] = [];
+            let out = entry.port;
+            for (let i = 0; i < lead; i++) {
+                leadCells.push(out);
+                out = add(out, back);
+            }
+            for (const id of PRIORITY_MERGERS) {
+                // Placed so its output port's cell is `out`, facing the entry
+                const trial: Placement = { uid: "trial", id, x: 0, y: 0, z: 0, rot };
+                const [outPort, priorityPort, otherPort] = placementPorts(trial);
+                const at: Placement = { ...trial, x: out[0] - outPort.x, y: out[1] - outPort.y, z: out[2] - outPort.z };
+                const cells = placementCells(at).map((c): Cell => [c.x, c.y, c.z]);
+                if (![...leadCells, ...cells].every(free)) continue;
+                const ports = placementPorts(at);
+                const inputs = [ports[1], ports[2]];
+                void priorityPort;
+                void otherPort;
+                // Room for the two belts coming in
+                const feeds = inputs.map((q) => portTarget(q) as Cell);
+                if (!feeds.every(free)) continue;
+                const base = [...leadCells, ...cells.filter((c) => c[2] === out[2])];
+                if (!base.every((c) => supportCost(occupancy, c[0], c[1], c[2]) !== null)) continue;
+                const placement: Placement = { ...at, uid: makeUid("pm"), label: itemName, lane: "route" };
+                const piece = beltPieceFor([back], [dir])!;
+                const belts: Placement[] = leadCells.map((c) => ({ uid: makeUid("b"), id: piece.id, x: c[0], y: c[1], z: c[2], rot: piece.rot, label: itemName, lane: "route" }));
+                const endAt = (k: number, suffix: string, items: LaneEnd["items"]): LaneEnd => ({
+                    uid: `${placement.uid}:${suffix}`,
+                    kind: "in",
+                    items,
+                    port: feeds[k],
+                    dir: oppositeSide(inputs[k].face as Side),
+                    block: entry.block,
+                });
+                const loopItems = entry.items.filter((i) => i.itemName === itemName);
+                return { placement, belts, cells: [...leadCells, ...cells], base, loop: endAt(0, "loop", loopItems), rest: endAt(1, "rest", entry.items) };
+            }
+        }
+        return null;
+    }
+
     const treeTotals = new Map<string, number>();
     const routes: RouteResult[] = [];
     const io: IoPoint[] = [];
@@ -794,7 +904,58 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
     const entryFed = new Set<string>();
 
     const surplusList: { itemName: string; rate: number }[] = [];
-    const connections = assignFlows(ends, options.exportable, surplusList, options.bought, options.exportCaps, options.primed);
+    // Fail products their own block takes again: each loop exit feeds an entry of its block
+    // with that item, which needs that much less from elsewhere
+    const loops: Connection[] = [];
+    const loopTaken = new Map<string, number>();
+    for (const exit of ends.filter((e) => e.kind === "out" && e.loop)) {
+        for (const item of exit.items) {
+            const left = (e: LaneEnd) => (e.items.find((i) => i.itemName === item.itemName)?.rate ?? 0) - (loopTaken.get(e.uid) ?? 0);
+            const entry = ends
+                .filter((e) => e.kind === "in" && e.block === exit.block && e.items.some((i) => i.itemName === item.itemName))
+                .sort((a, b) => left(b) - left(a))[0];
+            if (!entry) continue;
+            loops.push({ itemName: item.itemName, rate: item.rate, from: exit, to: entry, loop: true });
+            loopTaken.set(entry.uid, (loopTaken.get(entry.uid) ?? 0) + item.rate);
+        }
+    }
+    const looped = new Set(loops.map((c) => (c.from as LaneEnd).uid));
+    const flowEnds = ends
+        .filter((e) => !looped.has(e.uid))
+        .map((e) => (loopTaken.has(e.uid) ? { ...e, items: e.items.map((i) => ({ ...i, rate: Math.max(0, i.rate - (loops.find((c) => c.to === e && c.itemName === i.itemName) ? loopTaken.get(e.uid)! : 0)) })) } : e));
+    const original = new Map(flowEnds.map((e, k) => [e, ends.find((x) => x.uid === flowEnds[k].uid)!]));
+    const connections = [
+        ...loops,
+        ...assignFlows(flowEnds, options.exportable, surplusList, options.bought, options.exportCaps, options.primed).map((c) => ({
+            ...c,
+            from: c.from === "import" ? c.from : original.get(c.from) ?? c.from,
+            to: c.to === "export" ? c.to : original.get(c.to) ?? c.to,
+        })),
+    ];
+    // The loop enters through a priority merger: what comes back goes in before anything new,
+    // so the fail products never back up into their machines and stop them
+    for (const entry of new Set(loops.map((c) => c.to as LaneEnd))) {
+        const mine = loops.filter((c) => c.to === entry);
+        const others = connections.filter((c) => c.to === entry && !mine.includes(c));
+        if (!others.length) continue;
+        const merger = priorityMerger(entry, mine[0].itemName);
+        if (!merger) {
+            mine.forEach((c) => (c.unprioritized = true));
+            continue;
+        }
+        for (const p of [...merger.belts, merger.placement]) {
+            all.push(p);
+            byUid.set(p.uid, p);
+            addToOccupancy(occupancy, p);
+        }
+        for (const c of merger.base) all.push(...supportColumn(occupancy, c[0], c[1], c[2], 0, () => makeUid("s")));
+        merger.cells.forEach((c) => reserved.add(keyOf(c)));
+        // Every loop of the entry joins on the priority input
+        for (const c of mine) c.to = merger.loop;
+        for (const c of others) c.to = merger.rest;
+        reserveEnd(merger.loop);
+        reserveEnd(merger.rest);
+    }
 
     // An exit that feeds consumers and also exports its surplus gets a priority splitter:
     // consumers first, only the overflow leaves at the edge (a plain split would halve them)
@@ -977,7 +1138,7 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
             if (!connected) reserveEnd(e);
         }
         // Surplus that finds no way to a consumer just stays where it is (it was optional)
-        if (ok || !conn.surplus) routes.push({ itemName: conn.itemName, from: endName(conn.from), to: endName(conn.to), rate: conn.rate, ok, key: connKey(conn), ...(!ok && { reason: found ? "commit" : lastFailure }) });
+        if (ok || !conn.surplus) routes.push({ itemName: conn.itemName, from: endName(conn.from), to: endName(conn.to), rate: conn.rate, ok, key: connKey(conn), ...(!ok && { reason: found ? "commit" : lastFailure }), ...(conn.unprioritized && { unprioritized: true }) });
     }
 
     // Merge surplus per item

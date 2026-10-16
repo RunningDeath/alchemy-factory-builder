@@ -55,9 +55,10 @@ describe("Refined Sand tiers", () => {
       expect(report.edges[`${key(chain[i])}___${key(id)}`]).toBeDefined();
       expect(report.nodes[key(id)].perMachineInputs.map((f) => f.itemName)).toEqual([report.nodes[key(chain[i])].itemName]);
     });
-    // One producer per input: no stage is fed by another tier
+    // No stage is fed by another tier (other sources may add some: sand an athanor gives off on a failed salt)
     const { edgeRates } = collectPlanGraph(trees);
-    chain.forEach((id) => expect([...edgeRates.keys()].filter((e) => e.endsWith(`___${key(id)}`))).toHaveLength(1));
+    const tiers = new Set(chain.map(key));
+    chain.forEach((id) => expect([...edgeRates.keys()].filter((e) => e.endsWith(`___${key(id)}`) && tiers.has(e.split("___")[0]))).toHaveLength(id === chain[0] ? 0 : 1));
 
     expect(report.warnings).toEqual([]);
     expect(Object.values(report.edges).filter((e) => e.short)).toEqual([]);

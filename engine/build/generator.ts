@@ -20,6 +20,7 @@
  * space), each with a free row on its input side for bringing belts in. Connecting
  * the blocks to each other is left to the player.
  */
+import { moduleIssues } from "./checks";
 import { beltPieceFor } from "./belt-pieces";
 import { footprintPorts, getFootprint, isDirectlyStackable, oppositeSide, rotatedSize, SIDE_OFFSET, STACKS_ON_ITSELF, type Rotation } from "./footprint";
 import { buildOccupancy, cellKey, placementCells, placementPorts, type Placement } from "./layout";
@@ -32,7 +33,7 @@ import { expandPairs, pairSteps, pairTiers } from "./pairs";
 import { layPipes, PIPE_ID, reservePipeCells } from "./pipes";
 import { placeStarterBox, STARTER_BOX_ID } from "./starter";
 import { isFluidItem } from "../belt-analysis";
-import { getItem } from "../item-utils";
+import { getItem, getRecipeById } from "../item-utils";
 import { capabilities, isUnlocked, lockedBuildings, type BuildUnlocks, type Capabilities } from "./unlocks";
 import deviceMetadata from "../../data/device-metadata.json";
 import { flowRows, nearFeeders, packBlocks, transformBlock, type PackedItem } from "./packing";
@@ -340,6 +341,8 @@ function blockDepth(rows: number, sy: number, rowPitch: number, heating: ModuleS
  * the belt after it (1 row)
  */
 function filterRows(step: ModuleStep): number {
+    // A third product (advanced athanor fail products) passes a second, tall filter below the first
+    if (sortsOutputs(step) && step.outputs.length >= 3) return 6;
     return sortsOutputs(step) || step.starterBox ? 3 : 0;
 }
 
@@ -681,14 +684,37 @@ function buildTier(
                 // The filtered item takes the lower output of the tall filter, the side output of the
                 // flat one (the other output runs straight on); checked against player blueprints
                 const filtered = placed.id === "filter-vert" ? 0 : 1;
+                const third = step.outputs[2];
                 for (const [k, out] of [first, second].entries()) {
                     const port = outs[k === 0 ? filtered : 1 - filtered];
                     const face = port.face as Side;
                     const [tx, ty] = SIDE_OFFSET[face];
                     const piece = beltPieceFor([oppositeSide(face)], [face])!;
+                    if (k === 1 && third) {
+                        // The rest runs on into a tall filter: the second product out below, the third above
+                        const bx = port.x + tx;
+                        const by = port.y + ty;
+                        belts.push({ uid: nextUid("b"), id: piece.id, x: bx, y: by, z: port.z, rot: piece.rot, nodeKey: step.nodeKey, lane: "out", label: `${second.itemName} + ${third.itemName}` });
+                        const tall: Placement = { uid: nextUid("x"), id: "filter-vert", x: bx, y: by + 1, z: port.z, rot: rotFor("left", oppositeSide(face)), nodeKey: step.nodeKey, filterItem: second.itemName, label: `filter: ${second.itemName}` };
+                        lifts.push(tall);
+                        const [low, high] = placementPorts(tall).filter((q) => q.dir === "out").sort((a, b) => a.z - b.z);
+                        for (const [q, item] of [[low, second], [high, third]] as const) {
+                            const f = q.face as Side;
+                            const [fx, fy] = SIDE_OFFSET[f];
+                            const pc = beltPieceFor([oppositeSide(f)], [f])!;
+                            const loop = failProducts(step).has(item.itemName) && step.inputs.some((i) => i.itemName === item.itemName);
+                            belts.push({
+                                uid: nextUid("b"), id: pc.id, x: q.x + fx, y: q.y + fy, z: q.z, rot: pc.rot, nodeKey: step.nodeKey, lane: "out", label: item.itemName,
+                                laneEnd: { kind: "out", items: laneItems([item], served), ...(loop && { loop: true }) },
+                            });
+                        }
+                        continue;
+                    }
+                    // A fail product the machines take again goes straight back into the block
+                    const loop = failProducts(step).has(out.itemName) && step.inputs.some((i) => i.itemName === out.itemName);
                     belts.push({
                         uid: nextUid("b"), id: piece.id, x: port.x + tx, y: port.y + ty, z: port.z, rot: piece.rot, nodeKey: step.nodeKey, lane: "out", label: out.itemName,
-                        laneEnd: { kind: "out", items: laneItems([out], served) },
+                        laneEnd: { kind: "out", items: laneItems([out], served), ...(loop && { loop: true }) },
                     });
                 }
             }
@@ -943,6 +969,12 @@ function emitInputLanes(
     return { belts, lifts, lanes };
 }
 
+/** Items a step's machines give when a craft fails (athanors), from its recipe */
+function failProducts(step: ModuleStep): Set<string> {
+    const recipe = getRecipeById(step.nodeKey.split("-prod-")[1] ?? "");
+    return new Set((recipe?.outputs ?? []).filter((o) => o.fail).map((o) => getItem(o.id ?? o.name)?.name ?? o.name));
+}
+
 /** Pipe connections a machine needs: fluid inputs (in) or fluid outputs (out) */
 function pipeEndFor(step: ModuleStep): Placement["pipeEnd"] {
     const toRates = (list: StepFlow[]) => list.map((fl) => ({ itemName: fl.itemName, rate: fl.perMachineRate }));
@@ -993,19 +1025,23 @@ function heatingPlatform(step: ModuleStep, width: number, depth: number, origin:
         }
         const rows = ys.length;
         for (const [r, ry] of ys.entries()) {
-            let first = true;
+            let chain: string | null = null;
+            let prevX = -Infinity;
             for (const cx of xs) {
                 const x = origin.x + cx;
                 const y = top + ry;
+                // Heaters pass steam only back to back: a gap (no machine, or space between
+                // machines) starts a new chain, which takes the steam again
                 if (!underMachine(x, y)) {
-                    // A gap breaks the chain: the next heater takes the steam again
-                    first = true;
+                    chain = null;
                     continue;
                 }
+                if (x !== prevX + 3) chain = null;
+                prevX = x;
+                chain ??= nextUid("hc");
                 const heater: Placement = { uid: nextUid("h"), id: STEAM_HEATER_ID, x, y, z: 0, rot: 0 };
-                // The first heater of a row takes the steam; the rest get it through their neighbour
-                if (first) heater.pipeEnd = { kind: "in", items: [{ itemName: heating.fuelItem, rate: heating.fuelRate / rows }] };
-                first = false;
+                // Every heater of a chain may take the steam (at either end, whichever the belts leave free)
+                heater.pipeEnd = { kind: "in", items: [{ itemName: heating.fuelItem, rate: heating.fuelRate / rows }], chain };
                 placements.push(heater);
                 devices++;
                 platformDepth = Math.max(platformDepth, ry + 3);
@@ -1271,7 +1307,7 @@ export function generateModule(allSteps: ModuleStep[], given: ModuleOptions): Ge
 function generateBlocks(allSteps: ModuleStep[], options: ModuleOptions, budget: number, finish: boolean): GeneratedModule {
     let best: GeneratedModule | null = null;
     // One module of several: they line up front to back, so its depth counts most
-    const score = (m: GeneratedModule) => m.routes.filter((r) => !r.ok).length * 100000 + (finish ? m.size[0] * m.size[1] : m.size[1] * 100 + m.size[0]);
+    const score = (m: GeneratedModule) => brokenCount(m) * 100000 + (finish ? m.size[0] * m.size[1] : m.size[1] * 100 + m.size[0]);
     // Only the variants whose block shapes differ: the same blocks lay out the same
     const shapes = (levelLaneFloor: number) => buildBlocks(allSteps, { ...options, levelLaneFloor }).blocks.map((b) => `${b.info.width}x${b.info.depth}x${b.info.height}`).join("|");
     const seen = new Set<string>();
@@ -1399,7 +1435,7 @@ function generateBlocksWith(allSteps: ModuleStep[], options: ModuleOptions, budg
     // Keep the layout that routes everything with the fewest lifts and the least floor
     let best: GeneratedModule | null = null;
     const score = (m: GeneratedModule) =>
-        m.routes.filter((r) => !r.ok).length * 100000 +
+        brokenCount(m) * 100000 +
         m.placements.filter((p) => p.id === "conveyer-lift-upwards" || p.id === "conveyer-lift-downwards").length * 40 +
         // Belt length between blocks: long transports are what makes a module sprawl
         m.placements.filter((p) => p.uid.startsWith("rb-")).length * 3 +
@@ -1475,7 +1511,7 @@ function generateBlocksWith(allSteps: ModuleStep[], options: ModuleOptions, budg
         let bestOfSet: GeneratedModule | null = null;
         for (const [corridor, mode] of stacked ? towerAttempts : attempts) {
             // Long enough: settle for the best layout that routes everything
-            if (best?.routes.every((r) => r.ok) && spent() > budget) break;
+            if (best && brokenCount(best) === 0 && spent() > budget) break;
             // Even when no layout routes everything yet: settle for the best one after a while
             if (best && spent() > hardLimit) break;
             const label = `Layout ${attempt + 1} of up to ${total}${stacked ? " (stacked)" : ""}: routing belts`;
@@ -1492,9 +1528,9 @@ function generateBlocksWith(allSteps: ModuleStep[], options: ModuleOptions, budg
             // every corridor with the same towers
             if (stacked && retries < STACK_RETRIES && upFailures(result, set).size > 0) break;
             // All layouts of a corridor width get a chance before settling
-            if (mode === "packed" && best.routes.every((r) => r.ok)) break;
+            if (mode === "packed" && brokenCount(best) === 0) break;
         }
-        if (best?.routes.every((r) => r.ok) || !stacked || spent() > hardLimit) break;
+        if ((best && brokenCount(best) === 0) || !stacked || spent() > hardLimit) break;
         const inTower = sameTowerFailures(bestOfSet!, set);
         const up = upFailures(bestOfSet!, set);
         const failing =
@@ -1530,6 +1566,17 @@ function generateBlocksWith(allSteps: ModuleStep[], options: ModuleOptions, budg
 }
 
 type BlockFlow = { stage: number; feeders: number[]; feederWeights: number[] };
+
+const brokenMemo = new WeakMap<GeneratedModule, number>();
+/**
+ * What doesn't work in a layout: belts that couldn't be routed, heaters or pipe machines cut
+ * off from their fluid, machines getting items they can't use or none of an input (checks.ts),
+ * fail products looping back without a priority merger
+ */
+function brokenCount(m: GeneratedModule): number {
+    if (!brokenMemo.has(m)) brokenMemo.set(m, m.routes.filter((r) => !r.ok || r.unprioritized).length + moduleIssues(m.placements, m.io).length);
+    return brokenMemo.get(m)!;
+}
 
 /**
  * Where unneeded output goes, best first: the player's choice, then the knowledge altar,

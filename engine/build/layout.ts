@@ -27,9 +27,11 @@ export interface Placement {
     /** Generated block (index into the module's tiers) this building belongs to */
     block?: number;
     /** Open end of a generated lane: where items enter (in) or leave (out) the block */
-    laneEnd?: { kind: "in" | "out"; items: { itemName: string; rate: number }[] };
+    /** `loop`: a fail product its own machines take again (an athanor's iron): belted back into the block first */
+    laneEnd?: { kind: "in" | "out"; items: { itemName: string; rate: number }[]; loop?: boolean };
     /** Fluid this building takes in or gives out through its pipe ports */
-    pipeEnd?: { kind: "in" | "out"; items: { itemName: string; rate: number }[] };
+    /** `chain`: steam heaters back to back share their steam; one pipe into any of them feeds all */
+    pipeEnd?: { kind: "in" | "out"; items: { itemName: string; rate: number }[]; chain?: string };
     /** Filters: the item sent to the lower output (tall filter) or the side output (flat filter); everything else takes the other */
     filterItem?: string;
     /** Purchasing portals: the item bought */

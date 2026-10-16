@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import type { TierInfo } from "../../engine/build/generator";
 import type { IoPoint, RouteResult } from "../../engine/build/router";
+import type { ModuleIssue } from "../../engine/build/checks";
 import { billOfMaterials, countBuildings, layoutBounds, type LayoutIssue, type Placement, type PortStatus } from "../../engine/build/layout";
 import { buildingName, isMachine, itemDisplayName, STARTER_BOX_COLOR } from "../../lib/buildCatalog";
 import { formatRate } from "../../lib/beltDisplay";
@@ -10,6 +11,8 @@ import { formatRate } from "../../lib/beltDisplay";
 interface BuildInfoPanelProps {
     placements: Placement[];
     issues: LayoutIssue[];
+    /** Steam and belt contents over the whole module (see engine/build/checks) */
+    moduleIssues: ModuleIssue[];
     ports: PortStatus[];
     tiers: TierInfo[];
     routes: RouteResult[];
@@ -30,9 +33,23 @@ const ISSUE_TEXT: Record<LayoutIssue["kind"], string> = {
     "pipe-under-stand": "goes up or down under a lab stand (move the stand or the pipe)",
 };
 
+/** What a module-wide problem means for the building it names */
+function moduleIssueText(issue: ModuleIssue): string {
+    switch (issue.kind) {
+        case "no-fluid":
+            return `gets no ${issue.fluid ?? "fluid"}: its pipe ports reach no supply`;
+        case "foreign-items":
+            return `gets ${issue.items.join(", ")}, which it can't use: it blocks`;
+        case "missing-input":
+            return `gets no ${issue.items.join(", ")}`;
+        case "mixed-export":
+            return `(exit for ${issue.itemName}) also carries ${issue.items.join(", ")}`;
+    }
+}
+
 const DISPOSAL_LABEL = { altar: "Into a knowledge altar", trash: "Into a trash barrel", sell: "Sold at a dispatch portal" } as const;
 
-export function BuildInfoPanel({ placements, issues, ports, tiers, routes, io, surplus, finalProducts, onToggleExport, onSelect, onGoToLevel }: BuildInfoPanelProps) {
+export function BuildInfoPanel({ placements, issues, moduleIssues, ports, tiers, routes, io, surplus, finalProducts, onToggleExport, onSelect, onGoToLevel }: BuildInfoPanelProps) {
     const byUid = useMemo(() => new Map(placements.map((p) => [p.uid, p])), [placements]);
     const bounds = useMemo(() => layoutBounds(placements), [placements]);
     const bill = useMemo(() => [...billOfMaterials(placements).entries()].sort((a, b) => b[1] - a[1]), [placements]);
@@ -60,9 +77,26 @@ export function BuildInfoPanel({ placements, issues, ports, tiers, routes, io, s
 
             <section className="flex flex-col gap-1">
                 <h4 className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] font-bold">Checks</h4>
-                {issues.length === 0 && openPorts.length === 0 && placements.length > 0 && (
-                    <p className="text-[var(--success)]">No collisions, everything supported, all machine ports belted.</p>
+                {issues.length === 0 && moduleIssues.length === 0 && openPorts.length === 0 && placements.length > 0 && (
+                    <p className="text-[var(--success)]">No collisions, everything supported, all machine ports belted, steam everywhere, every belt carries only what its machines take.</p>
                 )}
+                {moduleIssues.slice(0, 12).map((issue, i) => {
+                    const p = byUid.get(issue.uid);
+                    return (
+                        <button
+                            key={`m${i}`}
+                            onClick={() => {
+                                onSelect(issue.uid);
+                                if (p) onGoToLevel(p.z);
+                            }}
+                            className="text-left text-[var(--error)] hover:underline cursor-pointer"
+                        >
+                            {p ? buildingName(p.id) : issue.uid} {p && <span className="text-[var(--text-muted)]">at {p.x},{p.y} (level {p.z}) </span>}
+                            {moduleIssueText(issue)}
+                        </button>
+                    );
+                })}
+                {moduleIssues.length > 12 && <p className="text-[var(--text-muted)]">…and {moduleIssues.length - 12} more</p>}
                 {issues.slice(0, 12).map((issue, i) => {
                     const p = byUid.get(issue.uid);
                     return (
@@ -196,6 +230,13 @@ function ConnectionsSection({ routes, io }: { routes: RouteResult[]; io: IoPoint
             <p className={failed.length ? "text-[var(--warning)]" : "text-[var(--success)]"}>
                 {routes.length - failed.length} of {routes.length} belt connections routed
             </p>
+            {routes
+                .filter((r) => r.unprioritized)
+                .map((r, i) => (
+                    <span key={`u${i}`} className="text-[var(--error)]">
+                        {r.itemName} back into {r.to}: no room for a priority merger, so new items can crowd it out and stop the machines
+                    </span>
+                ))}
             {sum("import").map(([item, rate]) => (
                 <span key={`i${item}`} className="text-[var(--info)]">
                     IN at the edge: {item} {formatRate(rate)}/m

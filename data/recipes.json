@@ -911,7 +911,15 @@
       {
         "id": "coke",
         "name": "Coke",
-        "count": 1
+        "count": 1,
+        "percentage": 50
+      },
+      {
+        "id": "charcoal",
+        "name": "Charcoal",
+        "count": 2,
+        "percentage": 50,
+        "fail": 1
       }
     ],
     "time": 3,
@@ -955,7 +963,15 @@
       {
         "id": "steelingot",
         "name": "Steel Ingot",
-        "count": 1
+        "count": 1,
+        "percentage": 25
+      },
+      {
+        "id": "ironingot",
+        "name": "Iron Ingot",
+        "count": 1,
+        "percentage": 75,
+        "fail": 1
       }
     ],
     "time": 4,
@@ -1209,7 +1225,15 @@
       {
         "id": "salt",
         "name": "Salt",
-        "count": 1
+        "count": 1,
+        "percentage": 33.3333
+      },
+      {
+        "id": "sand",
+        "name": "Sand",
+        "count": 6,
+        "percentage": 66.6667,
+        "fail": 1
       }
     ],
     "time": 6,
@@ -1277,7 +1301,15 @@
       {
         "id": "copperpowder2",
         "name": "Copper Powder",
-        "count": 1
+        "count": 1,
+        "percentage": 50
+      },
+      {
+        "id": "copperpowder",
+        "name": "Impure Copper Powder",
+        "count": 1,
+        "percentage": 50,
+        "fail": 1
       }
     ],
     "time": 6,
@@ -1515,7 +1547,15 @@
       {
         "id": "malachite",
         "name": "Malachite",
-        "count": 1
+        "count": 1,
+        "percentage": 50
+      },
+      {
+        "id": "shard1",
+        "name": "Crude Shard",
+        "count": 1,
+        "percentage": 50,
+        "fail": 1
       }
     ],
     "time": 12,
@@ -2343,7 +2383,15 @@
       {
         "id": "silverpowder3",
         "name": "Silver Powder",
-        "count": 1
+        "count": 1,
+        "percentage": 20
+      },
+      {
+        "id": "silverpowder",
+        "name": "Crude Silver Powder",
+        "count": 1,
+        "percentage": 80,
+        "fail": 1
       }
     ],
     "time": 6.4,
@@ -2387,7 +2435,15 @@
       {
         "id": "obsidian",
         "name": "Obsidian",
-        "count": 1
+        "count": 1,
+        "percentage": 50
+      },
+      {
+        "id": "marble",
+        "name": "Marble",
+        "count": 1,
+        "percentage": 50,
+        "fail": 1
       }
     ],
     "time": 6,
@@ -2536,7 +2592,22 @@
       {
         "id": "lapislazuli",
         "name": "Lapis Lazuli",
-        "count": 1
+        "count": 1,
+        "percentage": 33.3333
+      },
+      {
+        "id": "crystal1",
+        "name": "Shattered Crystal",
+        "count": 1,
+        "percentage": 33.3333,
+        "fail": 1
+      },
+      {
+        "id": "shard1",
+        "name": "Crude Shard",
+        "count": 1,
+        "percentage": 33.3333,
+        "fail": 2
       }
     ],
     "time": 12,
@@ -2743,7 +2814,22 @@
       {
         "id": "golddust3",
         "name": "Gold Dust",
-        "count": 1
+        "count": 1,
+        "percentage": 10
+      },
+      {
+        "id": "golddust2",
+        "name": "Impure Gold Dust",
+        "count": 1,
+        "percentage": 30,
+        "fail": 1
+      },
+      {
+        "id": "golddust",
+        "name": "Crude Gold Dust",
+        "count": 1,
+        "percentage": 60,
+        "fail": 2
       }
     ],
     "time": 8,

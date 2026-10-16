@@ -102,6 +102,12 @@ The human-readable version with diagrams is `docs/game-rules.html`. Open questio
 
 ## 6. Other machines
 
+- **Athanor fail products:** a craft can fail and give the fail product instead of the main one (DT_EnemyCrafting `FailRate1/2`, `FailProduct1/2`). Steel Ingot 75 % Iron Ingot back, Coke 50 % Charcoal, Salt 67 % Sand, Copper Powder 2 50 % Copper Powder, Malachite 50 % Crude Shard, Silver Powder 3 80 % Silver Powder, Obsidian 50 % Marble, Lapis 33 % Crystal + 33 % Crude Shard, Gold Dust 3 30 % + 60 % lower dusts. Checked in game: Factory Efficiency 7, 41.25/min iron and coke powder in, 10.31 steel and 30.94 iron out. **[Data]**, **[Player]**
+  - **Each product has its own output port:** the gold port gives the main product, the other (cyan) ports the fail products in order (DT_Buildings port colour `FFE763`). Athanor: main (1,0), fail (1,1); Advanced Athanor: main (2,1), fail 1 (2,0), fail 2 (2,2). **[Data]**, **[Player]**
+  - **Never mix them on one belt:** the main product's belt would carry the fail product to machines that can't use it, and they block. The generator sorts them with a filter at the end of the output lane (a second, tall filter for a third product). **[Player]**
+  - **A fail product the machine takes again** (Iron Ingot for steel, Crystal for lapis) goes back into its own input through a **Priority Merger**, the loop on the gold (priority) input: fresh items must never crowd the loop out, or the fail output backs up and the machines stop. **[Player]**
+- **Priority splitters and mergers:** the gold port is the priority side: the splitter's first output, the merger's first input. **[Data]**
+- **Steam heater pipes:** a pipe port on each of two opposite sides, turning with the heater; heaters pass steam only back to back (a gap needs its own pipe). A heater whose ports a belt or block covers gets no steam: a hard error. **[Player]**
 - **Iron Smelter:** its only input port is at the **top** (3 cells up), the output at the bottom; 1 ore → 100 ingots in 600 s. Such a raised-only input needs its own belt stub. **[Data]**
 - **Enhanced (Advanced) Grinder:** twice as fast as a grinder; used where it saves space. **[Player]**
 - **Brine:** large amounts (4000/min) come from rock salt, not athanors. Extractors and blenders have pipe ports; they may stack on other blocks (a suggestion, not a rule), and for brine coming from outside they behave the same as for brine made in the module. **[Player]**

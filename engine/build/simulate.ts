@@ -48,6 +48,9 @@ export interface FlowReport {
     openEnds: { uid: string; at: [number, number, number]; items: string[] }[];
 }
 
+/** What a purchasing portal is paid with */
+const COINS = new Set(["coppercoin", "silvercoin", "goldcoin"]);
+
 const isMachine = (p: Placement) => {
     const category = getFootprint(p.id)?.category;
     return category === "production" || category === "portal";
@@ -177,7 +180,7 @@ export function simulateFlow(placements: Placement[], recipeOf: RecipeOf = recip
             recipe: r,
             received: [...got].map(nameOf),
             missing: (r?.inputs ?? []).filter((i) => (i !== "(fertilizer)" ? !got.has(itemKey(i)) && !isFluid(i) : true)),
-            foreign: [...got].filter((k) => !wanted.has(k) && !(p.id.includes("nursery") && FERTILIZERS.has(k)) && !(p.id === "purchasing-portal" && k === "coppercoin")).map(nameOf),
+            foreign: [...got].filter((k) => !wanted.has(k) && !(p.id.includes("nursery") && FERTILIZERS.has(k)) && !(p.id === "purchasing-portal" && COINS.has(k))).map(nameOf),
             blockedOutputs: own.filter((l) => l.port.medium === "belt" && l.port.dir === "out" && !l.connectedTo).length,
             blockedPipes,
         };

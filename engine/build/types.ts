@@ -61,6 +61,8 @@ export interface FootprintPort {
     face: Side | VerticalFace;
     dir: "in" | "out" | "both";
     medium: "belt" | "pipe";
+    /** Machines with one output port per product (athanors): the main product (gold port in game) or a fail product */
+    product?: "main" | "fail1" | "fail2";
 }
 
 export interface BuildingFootprint {

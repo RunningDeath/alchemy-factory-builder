@@ -33,6 +33,7 @@ interface RawPortSide { IsInput: boolean; IsOutput: boolean }
 interface RawPort {
   InOutType: string;
   IsPipeGrid: boolean;
+  Color?: { Hex: string };
   position: Vec;
   Left: RawPortSide;
   Right: RawPortSide;
@@ -136,6 +137,21 @@ function portsFrom(raw: RawPort): FootprintPort[] {
   return ports;
 }
 
+/** Gold in game: the main product's output (and the priority side of splitters and mergers) */
+const MAIN_COLOR = "FFE763";
+
+/**
+ * A machine with several belt outputs, one of them gold (athanors), puts each product out of
+ * its own port: the gold one gives the main product, the others the fail products in order
+ */
+function withProducts(raw: RawBuilding, ports: FootprintPort[]): FootprintPort[] {
+  const outs = raw.InOutList.filter((p) => !p.IsPipeGrid && PORT_SIDES.some(([key]) => p[key].IsOutput));
+  if (outs.length < 2 || !outs.some((p) => p.Color?.Hex === MAIN_COLOR)) return ports;
+  let fail = 0;
+  const roles = new Map(outs.map((p) => [`${p.position.X},${p.position.Y},${p.position.Z}`, p.Color?.Hex === MAIN_COLOR ? "main" : `fail${++fail}`] as const));
+  return ports.map((q) => (q.medium === "belt" && q.dir === "out" && roles.has(`${q.x},${q.y},${q.z}`) ? { ...q, product: roles.get(`${q.x},${q.y},${q.z}`) as FootprintPort["product"] } : q));
+}
+
 export function toFootprint(row: string, raw: RawBuilding, english: Record<string, string>): BuildingFootprint | null {
   const category = categoryFor(row, raw);
   if (!category) return null;
@@ -147,6 +163,7 @@ export function toFootprint(row: string, raw: RawBuilding, english: Record<strin
   if (boxes.length === 0) return null;
 
   let ports = PORT_OVERRIDES[row]?.(raw) ?? raw.InOutList.flatMap(portsFrom);
+  if (category === "production") ports = withProducts(raw, ports);
 
   // Normalize so the bounding box starts at 0,0,0 (a few buildings use negative offsets)
   const offset = [0, 1, 2].map((i) => Math.min(...boxes.map((b) => b.min[i])));

@@ -72,7 +72,8 @@ export function buildGraph(solved: Solved, targets: Map<string, number>, ctx: Ef
     for (const { crafts, f } of active) {
         const node = recipeNode(f, crafts, ctx);
         nodes.set(node.id!, node);
-        for (const [id, count] of f.outputs) addSource(id, node, crafts * count);
+        // What it uses up itself (an athanor's failed iron going back in) is no source for others
+        for (const [id, count] of f.outputs) addSource(id, node, crafts * Math.min(count, Math.max(0, f.net.get(id) ?? count)));
     }
     for (const [key, rate] of solved.bought) {
         const node = rawFor(key.replace(/#external$/, ""));

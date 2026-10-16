@@ -155,9 +155,10 @@ export function simulateFlow(nodes: FlowNode[], edges: FlowEdge[], targets: Flow
         realized.set(n.key, drawn + asked);
     });
 
-    // Targets receive whatever the producer makes beyond what other nodes draw
+    // Targets receive whatever the producer makes beyond what other nodes draw of its main
+    // output (its byproducts are streams of their own)
     const drawnFrom = new Map<string, number>();
-    edges.forEach((e) => drawnFrom.set(e.source, (drawnFrom.get(e.source) || 0) + (edgeActual.get(e.key) || 0)));
+    edges.forEach((e) => !e.byproduct && drawnFrom.set(e.source, (drawnFrom.get(e.source) || 0) + (edgeActual.get(e.key) || 0)));
     const remaining = new Map<string, number>();
     const delivered = targets.map((t) => {
         if (!remaining.has(t.source)) {

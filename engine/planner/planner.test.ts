@@ -92,4 +92,15 @@ describe("planner edge cases", () => {
         if (mix) expect(nodes.some((n) => n.itemName === "Flax")).toBe(true);
         expect(roots[0].netOutputRate).toBeCloseTo(0.059, 6);
     });
+
+    test("athanor fail products: steel needs four coke powder each, the iron comes back", () => {
+        // In game (factory efficiency 7): 41.25 iron and coke powder in, 10.31 steel and 30.94 iron out
+        const cfg = config({ factoryEfficiency: 7, logisticsEfficiency: 7, targets: [{ item: "steelingot", rate: 40 }], selectedFuel: "steam", selfFuel: false });
+        const rep = report(cfg);
+        const athanor = Object.values(rep.nodes).find((n) => n.deviceId === "athanor")!;
+        expect(athanor.perMachineOutputs.map((f) => [f.itemName, Number(f.perMachineRate.toFixed(2))])).toEqual([["Steel Ingot", 10.31], ["Iron Ingot", 30.94]]);
+        const nodes = [...collectPlanGraph(calculatePlan(cfg)).nodes.values()] as ProductionNode[];
+        expect(nodes.find((n) => n.itemName === "Iron Ingot" && !n.isRaw)!.rate).toBeCloseTo(40, 6);
+        expect(nodes.find((n) => n.itemName === "Coke Powder")!.rate).toBeCloseTo(160, 6);
+    });
 });

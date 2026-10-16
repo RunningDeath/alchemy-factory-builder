@@ -48,6 +48,8 @@ export interface RecipeOutput {
     count: number | string;
     /** Chance in percent (absent: always) */
     percentage?: number | string;
+    /** A fail product (athanors): what a failed craft gives instead, out of its own port (1 or 2) */
+    fail?: 1 | 2;
 }
 
 export interface Recipe {
