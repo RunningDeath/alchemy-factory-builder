@@ -40,4 +40,11 @@ describe("what the belts carry", () => {
         const kinds = beltIssues(placements, io).map((i) => i.kind);
         expect(kinds).toContain("foreign-items");
     });
+
+    test("a nursery the plan feeds misses its fertilizer when none reaches it", () => {
+        const nursery: Placement = { uid: "n", id: "nursery", x: 0, y: 0, z: 0, rot: 0, nodeKey: "sage-prod-sage", fertilizer: "Growth Potion" };
+        expect(beltIssues([nursery], []).map((i) => i.kind)).toContain("missing-input");
+        // Without fertilizer in the plan nothing is missing
+        expect(beltIssues([{ ...nursery, fertilizer: undefined }], []).map((i) => i.kind)).not.toContain("missing-input");
+    });
 });

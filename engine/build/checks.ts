@@ -100,12 +100,14 @@ export function beltIssues(placements: Placement[], io: IoPoint[], recipeOf: Rec
     const inject = new Map<string, string[]>();
     for (const p of io.filter((x) => x.kind === "import")) inject.set(p.cell.join(","), [...(inject.get(p.cell.join(",")) ?? []), p.itemName]);
     const sim = simulateFlow(placements, recipeOf, inject);
+    const byUid = new Map(placements.map((p) => [p.uid, p]));
     const issues: ModuleIssue[] = [];
     for (const m of sim.machines) {
         // Without a known recipe there is nothing to tell a foreign item by
         if (m.recipe && m.foreign.length) issues.push({ kind: "foreign-items", uid: m.uid, items: m.foreign });
-        // Fertilizer counts only once one is chosen (the plan then names it)
-        const missing = m.missing.filter((i) => i !== "(fertilizer)");
+        // A nursery's fertilizer counts where the plan feeds it one (marked on the machine)
+        const fed = !!byUid.get(m.uid)?.fertilizer;
+        const missing = m.missing.filter((i) => i !== "(fertilizer)" || fed);
         if (missing.length) issues.push({ kind: "missing-input", uid: m.uid, items: missing });
     }
     const exports = new Map(io.filter((x) => x.kind === "export").map((x) => [x.cell.join(","), x.itemName]));

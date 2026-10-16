@@ -542,6 +542,7 @@ function buildTier(
                     nodeKey: step.nodeKey,
                     label: step.itemName,
                     pipeEnd: pipeEndFor(step),
+                    ...(fertilizerOf(step) && { fertilizer: fertilizerOf(step) }),
                 });
                 placed++;
             }
@@ -1107,6 +1108,12 @@ function emitInputLanes(
         }
     }
     return { belts, lifts, lanes };
+}
+
+/** The fertilizer a nursery step is fed (its belt input with nutrients), if any */
+function fertilizerOf(step: ModuleStep): string | undefined {
+    if (step.deviceId !== "nursery") return undefined;
+    return step.inputs.find((i) => (getItem(i.itemName)?.nutrient_value ?? 0) > 0)?.itemName;
 }
 
 /** Items a step's machines give when a craft fails (athanors), from its recipe */
