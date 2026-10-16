@@ -189,7 +189,10 @@ export function BuildPlanner() {
             const mod = msg.module;
             commit({ placements: mod.placements, options: opts, tiers: mod.tiers, routes: mod.routes, io: mod.io, surplus: mod.surplus, planKey: planKeyOf(steps) });
             const failed = mod.routes.filter((r) => !r.ok).length;
-            flash(failed ? `${failed} belt connection${failed === 1 ? "" : "s"} could not be routed` : `All ${mod.routes.length} belt connections routed`);
+            const routed = failed ? `${failed} belt connection${failed === 1 ? "" : "s"} could not be routed` : `All ${mod.routes.length} belt connections routed`;
+            // It needed more room than the width and depth set: say so until the next change
+            if (mod.grownTo) setMessage(`${routed}. It didn't fit in ${opts.maxWidth}×${opts.maxDepth}, so it grew to ${mod.grownTo[0]}×${mod.grownTo[1]}`);
+            else flash(routed);
             setLevel(0);
             setSelectedUid(null);
         };

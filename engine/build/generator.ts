@@ -192,6 +192,8 @@ export interface GeneratedModule {
     locked: string[];
     /** Routing effort it took (search steps, see routingWork) */
     work?: number;
+    /** Width and depth limits it needed past the player's (it didn't work within those) */
+    grownTo?: [number, number];
 }
 
 /** Widest corridor tried for stacked towers before falling back to blocks side by side */
@@ -210,6 +212,12 @@ const PEER_FLOOR_SLACK = 1.1;
 const WORK_BUDGET = 18_000_000;
 /** Share of the budget after which a block-shape variant without a working layout stops, once another has one */
 const DROP_FAILING_AFTER = 0.25;
+/** Most extra corridor a block gets for belts that didn't fit around it */
+const MAX_EXTRA_CORRIDOR = 2;
+/** Width and depth limits tried, times the player's, when a module doesn't work within them */
+const GROW_FACTORS = [1.25, 1.5, 2];
+/** Routing effort for each of those tries */
+const GROW_WORK = WORK_BUDGET;
 /** Past this many budgets the best layout so far is taken, belts routed or not */
 const HARD_LIMIT_FACTOR = 1;
 /**
@@ -626,6 +634,8 @@ function buildTier(
             }
         }
 
+        /** Plain output lanes of this level: their ends join into headers below */
+        const exits: { x: number; belt: Placement; items: { itemName: string; rate: number }[] }[] = [];
         for (const [laneX, byY] of [...hits.entries()].sort((a, b) => a[0] - b[0])) {
             const ys = [...byY.keys()];
             const feeds = ys.some((y) => byY.get(y)!.outs.length > 0);
@@ -658,7 +668,10 @@ function buildTier(
                 const belt: Placement = { uid: nextUid("b"), id: piece.id, x: laneX, y, z, rot: piece.rot, nodeKey: step.nodeKey, lane, label };
                 // The open ends are where the router connects the block to the rest of the module
                 if (feeds && y === yStart) belt.laneEnd = { kind: "in", items: laneItems(step.inputs, laneMachines("outs")) };
-                else if (collects && y === yEnd && !sorted && !boxHere) belt.laneEnd = { kind: "out", items: laneItems(step.outputs, laneMachines("ins")) };
+                else if (collects && y === yEnd && !sorted && !boxHere) {
+                    belt.laneEnd = { kind: "out", items: laneItems(step.outputs, laneMachines("ins")) };
+                    if (!feeds) exits.push({ x: laneX, belt, items: belt.laneEnd.items });
+                }
                 belts.push(belt);
             }
             // Self-made fertilizer: everything the nurseries get passes the box the player fills once
@@ -724,6 +737,7 @@ function buildTier(
             if (feeds) lanes.push(laneInfo("in", laneX - origin.x, level, z, step.inputs, laneMachines("outs"), beltSpeed));
             if (collects) lanes.push(laneInfo("out", laneX - origin.x, level, z, step.outputs, laneMachines("ins"), beltSpeed));
         }
+        belts.push(...outputHeaders(exits, bottom, z, beltSpeed, step.nodeKey, [...placements, ...lifts, ...belts]));
     }
     const fed = emitInputLanes(inputLanes, { top, bottom, beltSpeed, nodeKey: step.nodeKey, origin });
     belts.push(...fed.belts);
@@ -809,6 +823,56 @@ function buildTier(
             mixedInputs: step.inputs.length >= 2 && !feed.separate,
         },
     };
+}
+
+/**
+ * Output lanes of one level joined into as few exits as their items fit on: a header along
+ * the block's exit row (free past the machines) takes the lanes in from above and leaves at
+ * its last lane, down out of the block. Lanes of one block carry the same items (byproducts
+ * are sorted by filters before, and those lanes keep their own exits), so nothing mixes.
+ * Fewer exits, fewer belts for the router to fit between the blocks. Changes the lane ends'
+ * belts in place; returns the header belts between them
+ */
+function outputHeaders(exits: { x: number; belt: Placement; items: { itemName: string; rate: number }[] }[], y: number, z: number, beltSpeed: number, nodeKey: string, around: Placement[]): Placement[] {
+    if (exits.length < 2) return [];
+    const taken = buildOccupancy(around);
+    const own = new Set(exits.map((e) => e.belt.uid));
+    const free = (x: number) => (taken.get(cellKey(x, y, z)) ?? []).every((c) => own.has(c.uid));
+    const total = (list: typeof exits) => list.reduce((sum, e) => sum + e.items.reduce((t, i) => t + i.rate, 0), 0);
+    // Segments that each fit on one belt, of lanes side by side with a free row between them
+    const segments: (typeof exits)[] = [];
+    for (const e of [...exits].sort((a, b) => a.x - b.x)) {
+        const current = segments[segments.length - 1];
+        const last = current?.[current.length - 1];
+        const joins = current && total([...current, e]) <= beltSpeed + 1e-6 && Array.from({ length: e.x - last!.x - 1 }, (_, k) => last!.x + 1 + k).every(free);
+        if (joins) current.push(e);
+        else segments.push([e]);
+    }
+    const header: Placement[] = [];
+    for (const segment of segments) {
+        if (segment.length < 2) continue;
+        const items = segment[0].items.map((it) => ({ itemName: it.itemName, rate: segment.reduce((sum, e) => sum + (e.items.find((x) => x.itemName === it.itemName)?.rate ?? 0), 0) }));
+        const lastX = segment[segment.length - 1].x;
+        const byX = new Map(segment.map((e) => [e.x, e]));
+        for (let x = segment[0].x; x <= lastX; x++) {
+            const ins: Side[] = [];
+            if (byX.has(x)) ins.push("up");
+            if (x > segment[0].x) ins.push("left");
+            const outs: Side[] = [x < lastX ? "right" : "down"];
+            const piece = beltPieceFor(ins, outs) ?? beltPieceFor(ins.slice(0, 1), outs)!;
+            const lane = byX.get(x);
+            if (lane) {
+                // The lane's last belt becomes part of the header
+                lane.belt.id = piece.id;
+                lane.belt.rot = piece.rot;
+                delete lane.belt.laneEnd;
+                if (x === lastX) lane.belt.laneEnd = { kind: "out", items };
+            } else {
+                header.push({ uid: nextUid("b"), id: piece.id, x, y, z, rot: piece.rot, nodeKey, lane: "out", label: items.map((i) => i.itemName).join(" + ") });
+            }
+        }
+    }
+    return header;
 }
 
 /**
@@ -1294,11 +1358,19 @@ export function generateModule(allSteps: ModuleStep[], given: ModuleOptions): Ge
     const options = { ...given, maxHeight: given.maxHeight - CEILING_CELLS };
     const groups = moduleGroupsOf(allSteps, options.moduleGroups);
     const startWork = routingWork();
-    const module = withWorkLimit(MAX_WORK, () => !groups
-        ? generateBlocks(allSteps, options, WORK_BUDGET, true)
-        : groups.length === 1
-          ? generateBlocks(groups[0].steps, { ...options, stackBlocks: groups[0].tower || options.stackBlocks }, WORK_BUDGET, true)
-          : generateGrouped(allSteps, groups, options));
+    const single = !groups || groups.length === 1;
+    const blocksOf = (opts: ModuleOptions) =>
+        !groups ? generateBlocks(allSteps, opts, WORK_BUDGET, true) : generateBlocks(groups[0].steps, { ...opts, stackBlocks: groups[0].tower || opts.stackBlocks }, WORK_BUDGET, true);
+    let module = withWorkLimit(MAX_WORK, () => (single ? blocksOf(options) : generateGrouped(allSteps, groups!, options)));
+    // Doesn't work within the size asked for: wider and deeper together, step by step, until it does
+    const better = (a: GeneratedModule, b: GeneratedModule) => brokenCount(a) - brokenCount(b) || a.size[0] * a.size[1] - b.size[0] * b.size[1];
+    for (const factor of GROW_FACTORS) {
+        if (!single || brokenCount(module) === 0) break;
+        const grown = { ...options, maxWidth: Math.round(given.maxWidth * factor), maxDepth: Math.round(given.maxDepth * factor) };
+        options.onProgress?.(0, `Doesn't fit in ${given.maxWidth}×${given.maxDepth}: trying ${grown.maxWidth}×${grown.maxDepth}`);
+        const next = withWorkLimit(GROW_WORK, () => blocksOf(grown));
+        if (better(next, module) < 0) module = { ...next, grownTo: [grown.maxWidth, grown.maxDepth] };
+    }
     return { ...module, work: routingWork() - startWork };
 }
 
@@ -1524,6 +1596,8 @@ function* layoutAttempts(allSteps: ModuleStep[], options: ModuleOptions, budget:
     const spent = () => ownWork;
     let attempt = 0;
     let retries = 0;
+    /** Extra corridor per block, grown where belts didn't fit */
+    const roomy = new Map<number, number>();
     // Stacked towers first. When some belts don't fit, only the blocks they belong to leave
     // the towers and the rest tries again; side by side for everything as the last resort
     for (;;) {
@@ -1541,8 +1615,12 @@ function* layoutAttempts(allSteps: ModuleStep[], options: ModuleOptions, budget:
             const onProgress = options.onProgress && ((f: number) => options.onProgress!(Math.min(0.99, (base + f) / total), label));
             onProgress?.(0);
             const workBefore = routingWork();
-            const result = layOut(blocks, set, setFlow, corridor, mode, { ...options, onProgress }, can, leftovers, finish);
+            const extra = set.map((t) => Math.max(0, ...t.members.map((m) => roomy.get(m.index) ?? 0)));
+            const result = layOut(blocks, set, setFlow, corridor, mode, { ...options, onProgress }, can, leftovers, finish, extra);
             ownWork += routingWork() - workBefore;
+            // Belts that didn't fit: the next layouts leave their blocks more corridor (a little at a time)
+            for (const r of result.routes.filter((x) => !x.ok))
+                for (const i of [blockIndex.get(r.from), blockIndex.get(r.to)]) if (i !== undefined) roomy.set(i, Math.min(MAX_EXTRA_CORRIDOR, (roomy.get(i) ?? 0) + 1));
             if (!bestOfSet || score(result) < score(bestOfSet)) bestOfSet = result;
             if (!best || score(result) < score(best)) best = result;
             yield best;
@@ -1644,9 +1722,12 @@ function layOut(
     can: Capabilities,
     leftovers: Set<string>,
     finish: boolean,
+    extra: number[] = [],
 ): GeneratedModule {
     const pad = corridor * 2;
-    const sizes = towers.map((t) => ({ width: t.width + pad, depth: t.depth + pad }));
+    /** Corridor around each tower: wider around blocks whose belts didn't fit before */
+    const around = (ti: number) => corridor + (extra[ti] ?? 0);
+    const sizes = towers.map((t, ti) => ({ width: t.width + around(ti) * 2, depth: t.depth + around(ti) * 2 }));
     // Purchasing portals line up along the front, where the coins come in; the rest packs behind them
     const isPortal = (t: Tower) => t.members.every((m) => blocks[m.index].info.deviceId === PURCHASING_PORTAL);
     const front = towers.map((t, i) => (isPortal(t) ? i : -1)).filter((i) => i >= 0);
@@ -1688,14 +1769,15 @@ function layOut(
     const tiers: TierInfo[] = new Array(blocks.length);
     towers.forEach((tower, ti) => {
         const pos = packed.positions[ti];
-        const padded = tower.placements.map((p) => ({ ...p, x: p.x + corridor, y: p.y + corridor }));
-        const towerDepth = tower.depth + pad;
+        const c = around(ti);
+        const padded = tower.placements.map((p) => ({ ...p, x: p.x + c, y: p.y + c }));
+        const towerDepth = tower.depth + c * 2;
         blockPlacements.push(...transformBlock(padded, towerDepth, pos.rot, pos.x, pos.y));
         const turned = pos.rot === 1;
         for (const m of tower.members) {
             const info = blocks[m.index].info;
-            const x0 = m.dx + corridor;
-            const y0 = m.dy + corridor;
+            const x0 = m.dx + c;
+            const y0 = m.dy + c;
             // The block's size in the tower (it may have been turned to fit on top)
             const w = m.turned ? info.depth : info.width;
             const d = m.turned ? info.width : info.depth;

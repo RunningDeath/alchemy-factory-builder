@@ -102,7 +102,8 @@ export function beltIssues(placements: Placement[], io: IoPoint[], recipeOf: Rec
     const sim = simulateFlow(placements, recipeOf, inject);
     const issues: ModuleIssue[] = [];
     for (const m of sim.machines) {
-        if (m.foreign.length) issues.push({ kind: "foreign-items", uid: m.uid, items: m.foreign });
+        // Without a known recipe there is nothing to tell a foreign item by
+        if (m.recipe && m.foreign.length) issues.push({ kind: "foreign-items", uid: m.uid, items: m.foreign });
         // Fertilizer counts only once one is chosen (the plan then names it)
         const missing = m.missing.filter((i) => i !== "(fertilizer)");
         if (missing.length) issues.push({ kind: "missing-input", uid: m.uid, items: missing });

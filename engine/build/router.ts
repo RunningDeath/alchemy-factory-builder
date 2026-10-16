@@ -100,6 +100,8 @@ const PRIORITY_SPLITTER = "splitter-vert";
 const PRIORITY_MERGERS = ["merger", "merger-sym", "merger-vert"];
 /** Routing passes per layout: failed connections first in each next one */
 const ROUTE_PASSES = 6;
+/** Highest level a connection that failed before may climb to, stacking over other belts */
+const STACK_LEVELS = 6;
 /** Passes in a row without fewer failed connections than the best before giving up early */
 const STALE_PASSES = 2;
 /** Most cells a later pass adds to a connection's distance to vary the order */
@@ -1094,7 +1096,11 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
         const goalZs = conn.to === "export"
             ? [...nodes.values()].filter((n) => n.tree === `export:${conn.itemName}`).map((n) => n.cell[2])
             : [conn.to.port[2], ...[...nodes.values()].filter((n) => conn.to !== "export" && n.sinks.has(conn.to.uid)).map((n) => n.cell[2])];
-        const levels = [...new Set([0, 1, ...starts.map((st) => st.cell[2]), ...goalZs])].filter((z) => liftLevels.includes(z) || z <= 1).sort((a, b) => a - b);
+        // A connection that failed in an earlier pass may also climb over the other belts:
+        // corridor belts stacked on lifts and lab stands instead of a wider corridor
+        const retried = pass > 0 && priority.includes(connKey(conn));
+        const stack = retried ? Array.from({ length: Math.min(STACK_LEVELS, maxZ) + 1 }, (_, z) => z) : [];
+        const levels = [...new Set([0, 1, ...starts.map((st) => st.cell[2]), ...goalZs, ...stack])].filter((z) => liftLevels.includes(z) || z <= 1 || stack.includes(z)).sort((a, b) => a - b);
         const single = conn.from === "import" && (options.singleImport?.(conn.itemName) ?? false);
         // A single input (coins): branch off the one belt first, a new input only if that fails
         let found = search(single ? starts.filter((st) => !st.edge || !st.extra) : starts, goal, estimate, levels);
