@@ -4,7 +4,7 @@
  * wood block and lab stand columns down to whatever is below (machine tops that take a
  * load, or the ground); lab stands let lane belts underneath keep running.
  */
-import { buildOccupancy, cellKey, cellsCollide, placementCells, type Placement } from "./layout";
+import { buildOccupancy, cellKey, cellsCollide, placementCells, placementPorts, portTarget, type Placement } from "./layout";
 import { transformBlock } from "./packing";
 import { findLaneEnds } from "./router";
 import { addToOccupancy, isSupported, removeFromOccupancy, supportColumn, type Occupancy } from "./supports";
@@ -100,9 +100,29 @@ function blockedEnds(placements: Placement[]): number {
 
 const shift = (ps: Placement[], dx: number, dy: number, dz: number) => ps.map((p) => ({ ...p, x: p.x + dx, y: p.y + dy, z: p.z + dz }));
 
+/** Holds the cells a pipe needs at a port: nothing that supports a block may stand there */
+const PIPE_KEEP = "pipe-vertical";
+
+/**
+ * The tower's occupancy, with the cell in front of each pipe port and the one above it kept
+ * from supports: a pipe may pass a lab stand only level, so its step up from the port needs
+ * a cell no support column takes (the cauldron's steam pads under a stacked block)
+ */
 function occupancyOf(placements: Placement[]): Occupancy {
     const occupancy: Occupancy = new Map();
     placements.forEach((p) => addToOccupancy(occupancy, p));
+    for (const p of placements) {
+        if (!p.pipeEnd && p.id !== "steam-heater") continue;
+        for (const q of placementPorts(p)) {
+            if (q.medium !== "pipe" || q.face === "top" || q.face === "base") continue;
+            const [x, y, z] = portTarget(q);
+            for (const dz of [0, 1]) {
+                const taken = occupancy.get(cellKey(x, y, z + dz)) ?? [];
+                if (taken.length) continue;
+                addToOccupancy(occupancy, { uid: `keep:${x},${y},${z + dz}`, id: PIPE_KEEP, x, y, z: z + dz, rot: 0 });
+            }
+        }
+    }
     return occupancy;
 }
 
