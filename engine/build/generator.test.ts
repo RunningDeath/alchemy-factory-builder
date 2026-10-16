@@ -6,6 +6,7 @@ import { beltPieceFor } from "./belt-pieces";
 import { getFootprint } from "./footprint";
 import { DEFAULT_MODULE_OPTIONS, generateModule, machineRotation, moduleTooBig, stackingFor, UnbuildableError, type GeneratedModule, type ModuleStep } from "./generator";
 import { portConnections, validateLayout } from "./layout";
+import { moduleIssues } from "./checks";
 import { stepsFromReport } from "./module-steps";
 
 const options = { ...DEFAULT_MODULE_OPTIONS, beltSpeed: 165 };
@@ -417,5 +418,46 @@ describe("moduleTooBig", () => {
   test("refuses plans with thousands of machines instead of grinding for minutes", () => {
     expect(moduleTooBig([step({ deviceId: "grinder", machines: 5000 })])?.machines).toBe(5000);
     expect(moduleTooBig([step({ machines: 12 })])).toBeNull();
+  });
+});
+
+describe("athanor fail products", () => {
+  // Steel and its failed iron share the output lane up to the filter: that stretch must never
+  // carry more than a belt, the iron must get back in before new iron, nothing may be left over
+  test("steel: the shared lane fits one belt, the iron loops back through a priority merger", () => {
+    const cfg: PlannerConfig = {
+      targets: [{ item: "steelingot", rate: 40 }],
+      availableResources: [],
+      logisticsEfficiency: 7,
+      throwingEfficiency: 0,
+      factoryEfficiency: 7,
+      alchemySkill: 0,
+      fuelEfficiency: 3,
+      fertilizerEfficiency: 0,
+      salesAbility: 0,
+      negotiationSkill: 0,
+      customerMgmt: 0,
+      relicKnowledge: 0,
+      selectedFuel: "steam",
+      selfFuel: false,
+      machineRounding: "up",
+      planParallelLines: true,
+    };
+    const report = analyzeBelts(calculatePlan(cfg), cfg, { planParallelLines: true, machineRounding: "up" });
+    const steps = stepsFromReport(report, "steam");
+    const mod = generateModule(steps, { ...DEFAULT_MODULE_OPTIONS, beltSpeed: report.beltSpeed, finalProducts: ["Steel Ingot"], boughtItems: ["Steam"] });
+    const athanors = mod.tiers.filter((t) => t.deviceId === "athanor");
+    expect(athanors.length).toBeGreaterThan(0);
+    for (const lane of athanors.flatMap((t) => t.lanes.filter((l) => l.kind === "out"))) {
+      expect(lane.items.map((i) => i.itemName)).toEqual(["Steel Ingot", "Iron Ingot"]);
+      expect(lane.rate).toBeLessThanOrEqual(report.beltSpeed + 1e-6);
+    }
+    // Every lane sorts the two apart
+    expect(mod.placements.filter((p) => p.id.startsWith("filter") && p.filterItem === "Steel Ingot").length).toBeGreaterThanOrEqual(athanors.reduce((n, t) => n + t.lanes.filter((l) => l.kind === "out").length, 0));
+    // The iron goes back in first: a priority merger at each entry it shares with new iron
+    expect(mod.routes.every((r) => r.ok && !r.unprioritized)).toBe(true);
+    expect(mod.placements.some((p) => p.id.startsWith("merger"))).toBe(true);
+    expect(moduleIssues(mod.placements, mod.io)).toEqual([]);
+    expect(validateLayout(mod.placements)).toEqual([]);
   });
 });
