@@ -33,7 +33,8 @@ interface LayerGridProps {
     showSupports: boolean;
     makeUid: () => string;
     onPlace: (placements: Placement[]) => void;
-    onRemoveAt: (x: number, y: number) => void;
+    /** Absent in view mode: right-click does nothing */
+    onRemoveAt?: (x: number, y: number) => void;
     onSelectAt: (x: number, y: number) => void;
     onHoverCell?: (cell: [number, number] | null) => void;
 }
@@ -230,6 +231,7 @@ export function LayerGrid({
             onMouseUp={handleUp}
             onContextMenu={(e) => {
                 e.preventDefault();
+                if (!onRemoveAt) return;
                 const [x, y] = cellFromEvent(e);
                 onRemoveAt(x, y);
             }}

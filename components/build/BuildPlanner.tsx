@@ -72,6 +72,16 @@ export function BuildPlanner() {
 
     const [panel, setPanel] = useState<BuildPanel>("layout");
     const [tool, setTool] = useState<BuildTool | null>(null);
+    // View by default: a stray right-click mustn't remove a belt
+    const [editing, setEditing] = useState(false);
+    const pickTool = useCallback((next: BuildTool | null) => {
+        setTool(next);
+        if (next) setEditing(true);
+    }, []);
+    const changeEditing = useCallback((edit: boolean) => {
+        setEditing(edit);
+        if (!edit) setTool(null);
+    }, []);
     const [level, setLevel] = useState(0);
     const [selectedUid, setSelectedUid] = useState<string | null>(null);
     const [cellSize, setCellSize] = useState(22);
@@ -283,10 +293,10 @@ export function BuildPlanner() {
             } else if ((e.ctrlKey || e.metaKey) && key === "y") {
                 e.preventDefault();
                 redo();
-            } else if (key === "r") {
+            } else if (key === "r" && editing) {
                 if (tool) setTool({ ...tool, rot: ((tool.rot + 1) % 4) as Placement["rot"] });
                 else changeSelected((p) => ({ ...p, rot: ((p.rot + 1) % 4) as Placement["rot"] }));
-            } else if (key === "f") {
+            } else if (key === "f" && editing) {
                 if (tool) setTool({ ...tool, id: cycleVariant(tool.id) });
                 else changeSelected((p) => ({ ...p, id: cycleVariant(p.id) }));
             } else if (key === "e" || e.key === "PageUp") {
@@ -296,14 +306,14 @@ export function BuildPlanner() {
             } else if (e.key === "Escape") {
                 setTool(null);
                 setSelectedUid(null);
-            } else if ((e.key === "Delete" || e.key === "Backspace") && selectedUid) {
+            } else if ((e.key === "Delete" || e.key === "Backspace") && selectedUid && editing) {
                 setPlacements(removePlacement(placements, selectedUid));
                 setSelectedUid(null);
             }
         };
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);
-    }, [tool, selectedUid, placements, changeSelected, setPlacements, undo, redo]);
+    }, [tool, editing, selectedUid, placements, changeSelected, setPlacements, undo, redo]);
 
     if (!factory) return null;
 
@@ -323,6 +333,8 @@ export function BuildPlanner() {
                 />
             )}
             <BuildToolbar
+                editing={editing}
+                onEditingChange={changeEditing}
                 options={options}
                 onOptionsChange={(next) => factory && setBuildLayout(factory.id, { ...(layout ?? { placements: [] }), options: next })}
                 canGenerate={steps.length > 0 && !progress}
@@ -374,7 +386,7 @@ export function BuildPlanner() {
                         beltSpeed={report?.beltSpeed}
                         onChange={(modules, moduleGroups) => setBuildLayout(factory.id, { ...(layout ?? { placements: [] }), options: { ...options, modules, moduleGroups } })}
                     />
-                    <BuildPalette steps={steps} placedByNode={placedByNode} tool={tool} onSelectTool={setTool} />
+                    <BuildPalette steps={steps} placedByNode={placedByNode} tool={tool} onSelectTool={pickTool} />
                 </aside>
 
                 <div className={cn("flex-1 min-w-0 flex-col 2xl:flex", panel === "layout" ? "flex" : "hidden")}>
@@ -391,7 +403,11 @@ export function BuildPlanner() {
                                 {selected.label ? ` (${selected.label})` : ""} at {selected.x},{selected.y},{selected.z} · R rotate · F variant · Del remove
                             </span>
                         ) : (
-                            <span>Pick a building on the left. Click selects, right-click removes. Q/E change level.</span>
+                            <span>
+                                {editing
+                                    ? "Edit: pick a building on the left. Click selects, right-click removes. Q/E change level."
+                                    : "View: click a building to see what it is. Q/E change level. Switch to Edit to change the layout."}
+                            </span>
                         )}
                         {message && <span className="text-[var(--warning)] font-semibold">{message}</span>}
                         {layout?.planKey && placements.length > 0 && layout.planKey !== planKeyOf(steps) && (
@@ -409,7 +425,7 @@ export function BuildPlanner() {
                     <ItemLegend itemColors={itemColors} highlightItem={highlightItem} onHighlight={setHighlightItem} />
                     <div className={view === "split" ? "flex-1 min-h-0 grid grid-rows-2 xl:grid-rows-1 xl:grid-cols-2" : "flex-1 min-h-0 flex"}>
                         {view !== "3d" && (
-                            <div className="overflow-auto custom-scrollbar min-h-0 flex-1">
+                            <div className="overflow-auto custom-scrollbar min-h-0 min-w-0 flex-1">
                                 <LayerGrid
                                     placements={placements}
                                     occupancy={occupancy}
@@ -424,14 +440,14 @@ export function BuildPlanner() {
                                     showSupports={showSupports}
                                     makeUid={makeUid}
                                     onPlace={handlePlace}
-                                    onRemoveAt={handleRemoveAt}
+                                    onRemoveAt={editing ? handleRemoveAt : undefined}
                                     onSelectAt={handleSelectAt}
                                     onHoverCell={setHoverCell}
                                 />
                             </div>
                         )}
                         {view !== "2d" && (
-                            <div className="min-h-0 flex-1 border-l border-[var(--border)] bg-[var(--background-deep)]">
+                            <div className="min-h-0 min-w-0 flex-1 border-l border-[var(--border)] bg-[var(--background-deep)]">
                                 <View3D
                                     placements={placements}
                                     tiers={layout?.tiers ?? []}

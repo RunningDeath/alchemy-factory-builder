@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronUp, Download, FlipHorizontal2, Redo2, RotateCw, Sparkles, Trash2, Undo2, ZoomIn, ZoomOut } from "lucide-react";
+import { ChevronDown, ChevronUp, Download, Eye, FlipHorizontal2, Pencil, Redo2, RotateCw, Sparkles, Trash2, Undo2, ZoomIn, ZoomOut } from "lucide-react";
 import { useState } from "react";
 import type { ModuleOptions } from "../../engine/build/generator";
 import type { BuildUnlocks } from "../../engine/build/unlocks";
@@ -40,6 +40,9 @@ interface BuildToolbarProps {
     onExport: () => void;
     unlocks: BuildUnlocks;
     onUnlocksChange: (unlocks: BuildUnlocks) => void;
+    /** View only looks (a click selects); edit places, removes and turns buildings */
+    editing: boolean;
+    onEditingChange: (editing: boolean) => void;
 }
 
 const buttonClass =
@@ -123,6 +126,19 @@ export function BuildToolbar(props: BuildToolbarProps) {
                 <button onClick={() => props.onLevelChange(props.level + 1)} className={buttonClass} title="Level up (E)">
                     <ChevronUp size={12} />
                 </button>
+            </div>
+            <div className="flex items-center rounded-md border border-[var(--border)] overflow-hidden" role="group" aria-label="Mode">
+                {([false, true] as const).map((edit) => (
+                    <button
+                        key={String(edit)}
+                        onClick={() => props.onEditingChange(edit)}
+                        aria-pressed={props.editing === edit}
+                        className={`px-2 py-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider cursor-pointer transition-colors ${props.editing === edit ? "bg-[var(--accent-gold-dim)] text-[var(--background-deep)]" : "text-[var(--text-secondary)] hover:text-[var(--accent-gold)]"}`}
+                        title={edit ? "Edit: place, remove (right-click, Del) and turn buildings" : "View: look around; clicks only select"}
+                    >
+                        {edit ? <Pencil size={12} /> : <Eye size={12} />} {edit ? "Edit" : "View"}
+                    </button>
+                ))}
             </div>
             <button onClick={props.onRotate} disabled={!tool} className={buttonClass} title="Rotate (R)">
                 <RotateCw size={12} /> {tool ? `${tool.rot * 90}°` : "Rotate"}
