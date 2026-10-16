@@ -31,7 +31,7 @@ const opposite = (side: Side | VerticalFace): Side | VerticalFace => (side === "
  * fluid or by the pipe that rises to the module's top, where the player connects it.
  */
 export function fluidIssues(placements: Placement[]): ModuleIssue[] {
-    const pipes = new Map<string, Placement>();
+    const pipes = new Map<number, Placement>();
     for (const p of placements) if (p.id === "pipe") pipes.set(cellKey(p.x, p.y, p.z), p);
     const ports = new Map<string, WorldPort[]>();
     for (const p of placements) {
@@ -64,7 +64,7 @@ export function fluidIssues(placements: Placement[]): ModuleIssue[] {
             if (other?.pipeSides?.includes(opposite(side))) join(`c:${key}`, `c:${cellKey(...n)}`);
         }
     }
-    const portAt = new Map<string, { uid: string; face: Side | VerticalFace }[]>();
+    const portAt = new Map<number, { uid: string; face: Side | VerticalFace }[]>();
     for (const [uid, list] of ports) for (const q of list) portAt.set(cellKey(q.x, q.y, q.z), [...(portAt.get(cellKey(q.x, q.y, q.z)) ?? []), { uid, face: q.face }]);
     for (const [uid, list] of ports) {
         find(`m:${uid}`);

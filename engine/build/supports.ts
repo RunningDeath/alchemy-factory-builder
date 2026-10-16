@@ -8,7 +8,7 @@ import { cellKey, cellsCollide, placementCells, type Placement, type WorldCell }
 const FRAME_ID = "frame-single";
 const BLOCK_ID = "wood-block";
 
-export type Occupancy = Map<string, WorldCell[]>;
+export type Occupancy = Map<number, WorldCell[]>;
 
 export function addToOccupancy(occupancy: Occupancy, p: Placement): void {
     for (const c of placementCells(p)) {
@@ -17,6 +17,19 @@ export function addToOccupancy(occupancy: Occupancy, p: Placement): void {
         if (list) list.push(c);
         else occupancy.set(key, [c]);
     }
+}
+
+/** Takes placements out of the occupancy again (undoes addToOccupancy) */
+export function removeFromOccupancy(occupancy: Occupancy, placements: Placement[]): void {
+    for (const p of placements)
+        for (const c of placementCells(p)) {
+            const key = cellKey(c.x, c.y, c.z);
+            const list = occupancy.get(key);
+            if (!list) continue;
+            const rest = list.filter((o) => o.uid !== p.uid);
+            if (rest.length) occupancy.set(key, rest);
+            else occupancy.delete(key);
+        }
 }
 
 /** Something under (x, y, z) a belt or support can stand on (most machines can't carry a load) */
@@ -82,7 +95,7 @@ interface Point {
 
 /** Cells (above the first level) that something stands on a pillar with: belts and beam ends */
 function carriedCells(placements: Placement[]): Point[] {
-    const points = new Map<string, Point>();
+    const points = new Map<number, Point>();
     for (const p of placements) {
         const belt = isBeltPieceId(p.id);
         if (!belt && !p.id.startsWith("beam")) continue;
@@ -191,7 +204,7 @@ export function beamsUnderRuns(placements: Placement[], makeUid: () => string): 
 export function pruneSupports(placements: Placement[]): Placement[] {
     let current = placements;
     for (;;) {
-        const carried = new Set<string>();
+        const carried = new Set<number>();
         for (const p of current)
             for (const c of placementCells(p)) if (c.foundation) carried.add(cellKey(c.x, c.y, c.z - 1));
         const next = current.filter((p) => !SUPPORT_IDS.has(p.id) || carried.has(cellKey(p.x, p.y, p.z)));

@@ -18,7 +18,7 @@ const SELL_ID = "dispatch-portal";
 /** The trash barrel takes belts at this height */
 const TRASH_INPUT_Z = 3;
 
-type Occupancy = Map<string, WorldCell[]>;
+type Occupancy = Map<number, WorldCell[]>;
 
 function occupancyOf(placements: Placement[]): Occupancy {
     const occ: Occupancy = new Map();

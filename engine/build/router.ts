@@ -288,14 +288,14 @@ export function assignFlows(
 
 /** A belt or lift the router built, linked to its neighbours along the flow */
 interface RouteNode {
-    key: string;
+    key: number;
     uid: string;
     cell: Cell;
     ins: Side[];
     outs: Side[];
     lift: boolean;
-    prev: string[];
-    next: string[];
+    prev: number[];
+    next: number[];
     items: Set<string>;
     sources: Set<string>;
     sinks: Set<string>;
@@ -468,8 +468,8 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
     // Modules stand side by side in a line: belts come in at the front and leave at the back
     const onEdge = (c: Cell) => c[2] === 0 && (c[1] === minY || c[1] === maxY);
 
-    const nodes = new Map<string, RouteNode>();
-    const reserved = new Set<string>(); // lift columns and lane-end port cells of other connections
+    const nodes = new Map<number, RouteNode>();
+    const reserved = new Set<number>(); // lift columns and lane-end port cells of other connections
 
     const ends = findLaneEnds(all);
     // Keep each open lane end and the cell straight in front of it free until it is connected
@@ -546,7 +546,7 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
             bestStamp[i] = searchStamp;
             bestCost[i] = g;
         };
-        const supportOutside = new Map<string, number | null>();
+        const supportOutside = new Map<number, number | null>();
         const supports = (c: Cell): number | null => {
             if (!inBounds(c)) {
                 const k = keyOf(c);
@@ -666,8 +666,8 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
      * The first cell a path takes twice (a lift shaft through its own belt), or null. The
      * search knows cells and headings, not the path behind them, so it can find such a path
      */
-    function crossing(endNode: SearchNode): string | null {
-        const used = new Set<string>();
+    function crossing(endNode: SearchNode): number | null {
+        const used = new Set<number>();
         const steps: SearchNode[] = [];
         for (let n: SearchNode | null = endNode; n; n = n.parent) steps.unshift(n);
         for (const s of steps) {
@@ -792,7 +792,7 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
     }
 
     function walk(from: RouteNode, dir: "prev" | "next", visit: (n: RouteNode) => void) {
-        const seen = new Set<string>();
+        const seen = new Set<number>();
         const stack = [from];
         while (stack.length) {
             const n = stack.pop()!;
@@ -1097,7 +1097,7 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
             found = search(starts, goal, estimate, levels);
         }
         // A path through itself: search again without the cell it takes twice
-        const avoided: string[] = [];
+        const avoided: number[] = [];
         for (let k = found ? crossing(found.end) : null; found && k && avoided.length < CROSSING_RETRIES; k = found ? crossing(found.end) : null) {
             avoided.push(k);
             reserved.add(k);

@@ -10,7 +10,7 @@ import { isFluidItem } from "../belt-analysis";
 import { cauldronOutput, cauldronRecipeById } from "../cauldron";
 import type { Item, Recipe } from "../types";
 import { getFootprint } from "./footprint";
-import { buildOccupancy, placementPorts, portConnections, portTarget, type Placement, type WorldPort } from "./layout";
+import { buildOccupancy, cellKey, placementPorts, portConnections, portTarget, type Placement, type WorldPort } from "./layout";
 
 /** Item names compared loosely: display names, ids and the game's internal names all match */
 export const itemKey = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -171,7 +171,7 @@ export function simulateFlow(placements: Placement[], recipeOf: RecipeOf = recip
         const blockedPipes = own.filter((l) => {
             if (!usesPipes || l.port.medium !== "pipe" || l.connectedTo) return false;
             const [x, y, z] = portTarget(l.port);
-            return (occupancy.get(`${x},${y},${z}`) ?? []).some((o) => !o.id.startsWith("pipe"));
+            return (occupancy.get(cellKey(x, y, z)) ?? []).some((o) => !o.id.startsWith("pipe"));
         }).length;
         return {
             uid: p.uid,

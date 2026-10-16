@@ -7,7 +7,7 @@
 import { buildOccupancy, cellKey, cellsCollide, placementCells, type Placement } from "./layout";
 import { transformBlock } from "./packing";
 import { findLaneEnds } from "./router";
-import { addToOccupancy, isSupported, supportColumn, type Occupancy } from "./supports";
+import { addToOccupancy, isSupported, removeFromOccupancy, supportColumn, type Occupancy } from "./supports";
 
 export interface TowerMember {
     /** Block index */
@@ -138,31 +138,39 @@ function carry(occupancy: Occupancy, x: number, y: number, z: number, makeUid: (
     if (isSupported(occupancy, x, y, z)) return [];
     const column = supportColumn(occupancy, x, y, z, 0, makeUid);
     const lowest = column.length ? column[column.length - 1].z : z;
-    return isSupported(occupancy, x, y, lowest) ? column : null;
+    if (isSupported(occupancy, x, y, lowest)) return column;
+    removeFromOccupancy(occupancy, column);
+    return null;
 }
 
 /** Upper block placed `dz` up, standing on columns only */
-function onColumns(tower: Tower, moved: Placement[], dz: number, opts: TowerOptions): Fit | null {
-    const occupancy = occupancyOf(tower.placements);
+function onColumns(occupancy: Occupancy, moved: Placement[], dz: number, opts: TowerOptions): Fit | null {
     moved.forEach((p) => addToOccupancy(occupancy, p));
     const supports: Placement[] = [];
+    const done = (fit: Fit | null) => {
+        removeFromOccupancy(occupancy, [...moved, ...supports]);
+        return fit;
+    };
     for (const c of moved.flatMap(placementCells).filter((c) => c.z === dz && c.foundation)) {
         const column = carry(occupancy, c.x, c.y, c.z, opts.makeUid);
-        if (!column) return null;
+        if (!column) return done(null);
         supports.push(...column);
     }
-    return { dz, moved, supports };
+    return done({ dz, moved, supports });
 }
 
 /**
  * Upper block on a deck of beams one level up: most machines can't carry a load, so the
  * beams span across them and rest on columns at their ends (lanes, gaps, the ground)
  */
-function onDeck(tower: Tower, moved: Placement[], dz: number, axis: "x" | "y", opts: TowerOptions): Fit | null {
+function onDeck(occupancy: Occupancy, moved: Placement[], dz: number, axis: "x" | "y", opts: TowerOptions): Fit | null {
     const deckZ = dz - 1;
-    const occupancy = occupancyOf(tower.placements);
     moved.forEach((p) => addToOccupancy(occupancy, p));
     const supports: Placement[] = [];
+    const done = (fit: Fit | null) => {
+        removeFromOccupancy(occupancy, [...moved, ...supports]);
+        return fit;
+    };
     const needed = moved.flatMap(placementCells).filter((c) => c.z === dz && c.foundation);
     const lineOf = (c: { x: number; y: number }) => (axis === "x" ? c.y : c.x);
     const posOf = (c: { x: number; y: number }) => (axis === "x" ? c.x : c.y);
@@ -182,27 +190,30 @@ function onDeck(tower: Tower, moved: Placement[], dz: number, axis: "x" | "y", o
                     const beam: Placement = { uid: opts.makeUid(), id, x: origin.x, y: origin.y, z: deckZ, rot: axis === "x" ? 1 : 0 };
                     const cells = placementCells(beam);
                     if (!fits(occupancy, beam) || !cells.some((c) => posOf(c) === first && lineOf(c) === line)) continue;
-                    const trial = new Map([...occupancy].map(([k, v]) => [k, [...v]]));
-                    addToOccupancy(trial, beam);
+                    // Tried in place: the beam and its columns leave again if an end can't be carried
+                    addToOccupancy(occupancy, beam);
                     const ends = cells.filter((c) => c.foundation);
-                    const columns = ends.map((c) => carry(trial, c.x, c.y, c.z, opts.makeUid));
-                    if (columns.some((col) => !col)) continue;
+                    const columns = ends.map((c) => carry(occupancy, c.x, c.y, c.z, opts.makeUid));
+                    if (columns.some((col) => !col)) {
+                        removeFromOccupancy(occupancy, [beam, ...columns.flatMap((col) => col ?? [])]);
+                        continue;
+                    }
                     placed = [beam, ...columns.flatMap((col) => col!)];
-                    trial.forEach((v, k) => occupancy.set(k, v));
                     const covered = new Set(cells.map(posOf));
                     for (let i = todo.length - 1; i >= 0; i--) if (covered.has(todo[i])) todo.splice(i, 1);
                 }
                 if (placed) break;
             }
-            if (!placed) return null;
+            if (!placed) return done(null);
             supports.push(...placed);
         }
     }
-    return { dz, moved, supports };
+    return done({ dz, moved, supports });
 }
 
 /** Puts `upper` on `tower` at (dx, dy): the columns and beams it needs, or null when it can't stand there */
-function mount(tower: Tower, top: Map<string, number>, upper: TowerBlock, dx: number, dy: number, opts: TowerOptions): Fit | null {
+/** `occupancy`: the tower's, shared by all tries (each takes out what it adds) */
+function mount(tower: Tower, occupancy: Occupancy, top: Map<string, number>, upper: TowerBlock, dx: number, dy: number, opts: TowerOptions): Fit | null {
     const cells = upper.placements.flatMap(placementCells);
     // Lowest height where every cell of the upper block clears the tower
     let dz = 0;
@@ -211,12 +222,12 @@ function mount(tower: Tower, top: Map<string, number>, upper: TowerBlock, dx: nu
     if (dz === 0) return null;
     const height = Math.max(...cells.map((c) => c.z)) + 1;
     if (dz + height > opts.maxHeight) return null;
-    const direct = onColumns(tower, shift(upper.placements, dx, dy, dz), dz, opts);
+    const direct = onColumns(occupancy, shift(upper.placements, dx, dy, dz), dz, opts);
     if (direct) return direct;
     if (dz + 1 + height > opts.maxHeight) return null;
     const raised = shift(upper.placements, dx, dy, dz + 1);
     // Beams the way that needs the fewest supports
-    const decks = [onDeck(tower, raised, dz + 1, "x", opts), onDeck(tower, raised, dz + 1, "y", opts)].filter((d): d is Fit => !!d);
+    const decks = [onDeck(occupancy, raised, dz + 1, "x", opts), onDeck(occupancy, raised, dz + 1, "y", opts)].filter((d): d is Fit => !!d);
     return decks.sort((a, b) => a.supports.length - b.supports.length)[0] ?? null;
 }
 
@@ -273,6 +284,7 @@ export function buildTowers(blocks: TowerBlock[], opts: TowerOptions): Tower[] {
             let towerBest: Candidate | null = null;
             for (const { upper, turned } of variants) {
             const top = topMap(tower.placements);
+            const occupancy = occupancyOf(tower.placements);
             const apart = [...tower.placements, ...upper.placements.map((p) => ({ ...p, x: p.x + 10000 }))];
             const blockedBefore = blockedEnds(apart);
             const related = tower.members.some((m) => opts.related(m.index, i));
@@ -282,7 +294,7 @@ export function buildTowers(blocks: TowerBlock[], opts: TowerOptions): Tower[] {
             const ys = [Math.min(0, tower.depth - upper.depth) - OVERHANG, Math.max(0, tower.depth - upper.depth) + OVERHANG];
             for (let dx = xs[0]; dx <= xs[1]; dx++)
                 for (let dy = ys[0]; dy <= ys[1]; dy++) {
-                    const fit = mount(tower, top, upper, dx, dy, opts);
+                    const fit = mount(tower, occupancy, top, upper, dx, dy, opts);
                     if (!fit) continue;
                     const together = [...tower.placements, ...fit.moved, ...fit.supports];
                     if (blockedEnds(together) > blockedBefore) continue;

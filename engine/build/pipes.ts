@@ -7,7 +7,7 @@
  * up to the module's top, where the player connects it.
  */
 import { footprintCells, getFootprint, oppositeSide, SIDE_OFFSET } from "./footprint";
-import { buildOccupancy, cellsCollide, placementPorts, type Placement } from "./layout";
+import { buildOccupancy, cellKey, cellOf, cellsCollide, placementPorts, type Placement } from "./layout";
 import type { Side, VerticalFace } from "./types";
 
 export const PIPE_ID = "pipe";
@@ -84,7 +84,7 @@ function pipePorts(placements: Placement[], cellFree: (x: number, y: number, z: 
 export function reservePipeCells(placements: Placement[], makeUid: () => string): Placement[] {
     const occupancy = buildOccupancy(placements);
     const reserved = new Set<string>();
-    const free = (x: number, y: number, z: number) => !occupancy.get(key(x, y, z))?.length && !reserved.has(key(x, y, z));
+    const free = (x: number, y: number, z: number) => !occupancy.get(cellKey(x, y, z))?.length && !reserved.has(key(x, y, z));
     const ports = pipePorts(placements, free);
     const out: Placement[] = [];
     const reserve = (x: number, y: number, z: number, resource: string) => {
@@ -118,13 +118,13 @@ export function layPipes(input: Placement[], maxHeight: number, makeUid: () => s
     const cells = new Map<string, { resource: string; sides: Set<Side | VerticalFace> }>();
     // A pipe shares a cell with what leaves it room (a lab stand), not with a wood block or belt
     const pipeCell = footprintCells(getFootprint(PIPE_ID)!)[0];
-    const blocked = (x: number, y: number, z: number) => !!occupancy.get(key(x, y, z))?.some((c) => cellsCollide(c, pipeCell));
+    const blocked = (x: number, y: number, z: number) => !!occupancy.get(cellKey(x, y, z))?.some((c) => cellsCollide(c, pipeCell));
     // A lab stand stands over a pipe that stays on its level (straight or bending across), not
     // over one that goes up or down (checked in game): no vertical step into or out of its cell
-    const shared = (x: number, y: number, z: number) => occupancy.has(key(x, y, z)) && !blocked(x, y, z);
+    const shared = (x: number, y: number, z: number) => occupancy.has(cellKey(x, y, z)) && !blocked(x, y, z);
     const verticalOk = (a: Cell, b: Cell) => a[2] === b[2] || (!shared(...a) && !shared(...b));
     const ports = pipePorts(placements, (x, y, z) => !blocked(x, y, z));
-    const all = [...occupancy.keys()].map((k) => k.split(",").map(Number));
+    const all = [...occupancy.keys()].map(cellOf);
     const bounds = {
         minX: Math.min(...all.map((c) => c[0])) - 1,
         maxX: Math.max(...all.map((c) => c[0])) + 1,

@@ -19,7 +19,7 @@ export interface BuildTool {
 
 interface LayerGridProps {
     placements: Placement[];
-    occupancy: Map<string, WorldCell[]>;
+    occupancy: Map<number, WorldCell[]>;
     level: number;
     issuesByUid: Map<string, LayoutIssue[]>;
     ports: PortStatus[];

@@ -62,12 +62,30 @@ export type LayoutIssue =
     /** A pipe goes up or down in a lab stand's cell: a lab stand only stands over a pipe that stays on its level */
     | { kind: "pipe-under-stand"; uid: string };
 
-export const cellKey = (x: number, y: number, z: number) => `${x},${y},${z}`;
+/**
+ * One number per cell (no "x,y,z" string to build and hash on every lookup): x and y in
+ * 16 bits each, z in 8, offset so negative values (a margin, the cell below the ground)
+ * stay apart. Exact in a double
+ */
+export const cellKey = (x: number, y: number, z: number): number => ((x + 32768) * 65536 + (y + 32768)) * 256 + (z + 128);
+/** The cell a cellKey stands for */
+export function cellOf(key: number): [number, number, number] {
+    const z = (key % 256) - 128;
+    const rest = Math.floor(key / 256);
+    return [Math.floor(rest / 65536) - 32768, (rest % 65536) - 32768, z];
+}
+
+/** Cells per placement object, kept while it stays where it is (callers only read them) */
+const cellsOf = new WeakMap<Placement, { id: string; uid: string; x: number; y: number; z: number; rot: number; cells: WorldCell[] }>();
 
 export function placementCells(p: Placement): WorldCell[] {
+    const hit = cellsOf.get(p);
+    if (hit && hit.id === p.id && hit.uid === p.uid && hit.x === p.x && hit.y === p.y && hit.z === p.z && hit.rot === p.rot) return hit.cells;
     const fp = getFootprint(p.id);
     if (!fp) return [];
-    return footprintCells(fp, p.rot).map((c) => ({ ...c, x: c.x + p.x, y: c.y + p.y, z: c.z + p.z, uid: p.uid, id: p.id }));
+    const cells = footprintCells(fp, p.rot).map((c) => ({ ...c, x: c.x + p.x, y: c.y + p.y, z: c.z + p.z, uid: p.uid, id: p.id }));
+    cellsOf.set(p, { id: p.id, uid: p.uid, x: p.x, y: p.y, z: p.z, rot: p.rot, cells });
+    return cells;
 }
 
 export function placementPorts(p: Placement): WorldPort[] {
@@ -77,8 +95,8 @@ export function placementPorts(p: Placement): WorldPort[] {
 }
 
 /** Cell → everything occupying it */
-export function buildOccupancy(placements: Placement[]): Map<string, WorldCell[]> {
-    const map = new Map<string, WorldCell[]>();
+export function buildOccupancy(placements: Placement[]): Map<number, WorldCell[]> {
+    const map = new Map<number, WorldCell[]>();
     for (const p of placements) {
         for (const c of placementCells(p)) {
             const key = cellKey(c.x, c.y, c.z);
@@ -95,7 +113,7 @@ export function cellsCollide(a: FootprintCell, b: FootprintCell): boolean {
 }
 
 /** Issues for the given placement against everything else in the occupancy map */
-export function placementIssues(p: Placement, occupancy: Map<string, WorldCell[]>): LayoutIssue[] {
+export function placementIssues(p: Placement, occupancy: Map<number, WorldCell[]>): LayoutIssue[] {
     if (!getFootprint(p.id)) return [{ kind: "unknown", uid: p.uid }];
     const cells = placementCells(p);
     const issues: LayoutIssue[] = [];
@@ -173,7 +191,7 @@ export interface PortStatus {
 /** Connection status of every port in the layout */
 export function portConnections(placements: Placement[]): PortStatus[] {
     const ports = placements.flatMap(placementPorts);
-    const byCell = new Map<string, WorldPort[]>();
+    const byCell = new Map<number, WorldPort[]>();
     for (const port of ports) {
         const key = cellKey(port.x, port.y, port.z);
         const list = byCell.get(key);

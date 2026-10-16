@@ -54,7 +54,7 @@ export interface BlueprintBody {
 const STARTER_BOX_COLOR = [64, 64, 255, 255];
 
 /** Whether something at the cell `out` of `p` takes items in from `p` */
-function outputConnected(p: Placement, out: Side, byCell: Map<string, Placement[]>): boolean {
+function outputConnected(p: Placement, out: Side, byCell: Map<number, Placement[]>): boolean {
     const [dx, dy] = SIDE_OFFSET[out];
     const target = byCell.get(cellKey(p.x + dx, p.y + dy, p.z)) ?? [];
     return target.some(
@@ -86,7 +86,7 @@ function plainRecord(p: Placement, fp: BuildingFootprint): Record {
  * Every belt piece, splits and merges included, becomes a plain belt: that is all player
  * blueprints use, and the fixed pieces are a separate unlock in game.
  */
-function beltRecord(p: Placement, byCell: Map<string, Placement[]>): Record {
+function beltRecord(p: Placement, byCell: Map<number, Placement[]>): Record {
     const belt = getFootprint("belt")!;
     const ports = placementPorts(p);
     const outs = p.id === "belt" ? [beltOutput(p.rot)] : ports.filter((q) => q.dir === "out").map((q) => q.face as Side);
@@ -115,7 +115,7 @@ function pipeRecord(p: Placement, fp: BuildingFootprint): Record {
 /** Converts placements to blueprint buildings; lifts are grouped into one building each */
 function toRecords(placements: Placement[], warnings: string[]): Record[] {
     // Every cell a building takes: a belt feeding a big machine meets it away from its origin
-    const byCell = new Map<string, Placement[]>();
+    const byCell = new Map<number, Placement[]>();
     for (const p of placements)
         for (const c of placementCells(p)) {
             const key = cellKey(c.x, c.y, c.z);

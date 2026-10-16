@@ -7,7 +7,7 @@
  */
 import { beltPieceFor } from "./belt-pieces";
 import { getFootprint, oppositeSide, rotateSide, type Rotation } from "./footprint";
-import { buildOccupancy, placementCells, placementIssues, placementPorts, portConnections, type Placement } from "./layout";
+import { buildOccupancy, cellKey, placementCells, placementIssues, placementPorts, portConnections, type Placement } from "./layout";
 import type { Side } from "./types";
 
 export const STARTER_BOX_ID = "small-container-side";
@@ -120,7 +120,7 @@ export function placeStarterBox(
         const occupancy = buildOccupancy(layout);
         const cells = placementCells(box);
         const covered = cells.some((c) => {
-            for (let z = c.z + 1; z < maxHeight; z++) if (occupancy.get(`${c.x},${c.y},${z}`)?.length) return true;
+            for (let z = c.z + 1; z < maxHeight; z++) if (occupancy.get(cellKey(c.x, c.y, z))?.length) return true;
             return false;
         });
         const edge = Math.min(...cells.map((c) => Math.min(c.x - minX, maxX - c.x, c.y - minY, maxY - c.y)));
