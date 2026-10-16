@@ -486,8 +486,24 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
     const ends = findLaneEnds(all);
     // Keep each open lane end and the cell straight in front of it free until it is connected
     const approach = (e: LaneEnd): Cell => add(e.port, e.kind === "in" ? oppositeSide(e.dir) : e.dir);
-    const reserveEnd = (e: LaneEnd) => [keyOf(e.port), keyOf(approach(e))].forEach((k) => reserved.add(k));
+    // Lane ends side by side (a filter's two exits, a product and its byproduct) keep one cell
+    // more: the first belt turns past it, not right across the other's way out
+    const paired = new Set(
+        ends
+            .filter((e) => ends.some((o) => o !== e && o.dir === e.dir && o.port[2] === e.port[2] && Math.abs(o.port[0] - e.port[0]) + Math.abs(o.port[1] - e.port[1]) === 1))
+            .map((e) => e.uid),
+    );
+    /** The cells kept free for a lane end until its belt comes */
+    const endCells = (e: LaneEnd): number[] => {
+        const cells = [keyOf(e.port), keyOf(approach(e))];
+        if (paired.has(e.uid)) cells.push(keyOf(add(approach(e), e.kind === "in" ? oppositeSide(e.dir) : e.dir)));
+        return cells;
+    };
+    const reserveEnd = (e: LaneEnd) => endCells(e).forEach((k) => reserved.add(k));
     ends.forEach(reserveEnd);
+    /** How many lane ends keep each cell: one end's search may only use the cells no other end needs */
+    const keptBy = new Map<number, Set<string>>();
+    for (const e of ends) for (const k of endCells(e)) keptBy.set(k, (keptBy.get(k) ?? new Set()).add(e.uid));
     // Heights worth lifting to: the ground and every lane level
     const liftLevels = [...new Set([0, 1, ...ends.map((e) => e.port[2])])].filter((z) => z <= Math.max(1, options.maxHeight - 1)).sort((a, b) => a - b);
 
@@ -826,7 +842,7 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
         const dir = exit.dir;
         // Not in the way of other lane ends: the cells in front of them stay free for their belts
         const own = new Set([keyOf(exit.port), keyOf(approach(exit))]);
-        const othersEnds = new Set(ends.filter((e) => e !== exit).flatMap((e) => [keyOf(e.port), keyOf(approach(e))]));
+        const othersEnds = new Set(ends.filter((e) => e !== exit).flatMap(endCells));
         const free = (c: Cell) => inBounds(c) && !nodes.has(keyOf(c)) && (own.has(keyOf(c)) || (!reserved.has(keyOf(c)) && !othersEnds.has(keyOf(c)))) && (occupancy.get(keyOf(c)) ?? []).every((o) => (o.layers & 7) === 0);
         for (let lead = 0; lead <= SPLITTER_LEAD; lead++) {
             const leadCells: Cell[] = [];
@@ -865,7 +881,7 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
         const dir = entry.dir;
         const back = oppositeSide(dir);
         const own = new Set([keyOf(entry.port), keyOf(approach(entry))]);
-        const othersEnds = new Set(ends.filter((e) => e !== entry).flatMap((e) => [keyOf(e.port), keyOf(approach(e))]));
+        const othersEnds = new Set(ends.filter((e) => e !== entry).flatMap(endCells));
         const free = (c: Cell) => inBounds(c) && !nodes.has(keyOf(c)) && (own.has(keyOf(c)) || (!reserved.has(keyOf(c)) && !othersEnds.has(keyOf(c)))) && (occupancy.get(keyOf(c)) ?? []).every((o) => (o.layers & 7) === 0);
         // Where the merger can stand: straight back from the entry, or beside it, a corner belt in
         // front of the entry taking its items in from the side (a block's lane often runs right
@@ -1020,6 +1036,15 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
         return (h / 4294967296) * ORDER_SHUFFLE;
     };
     connections.sort((a, b) => rank(a) - rank(b) || distance(a) + shuffle(a) - distance(b) - shuffle(b));
+    // Several connections from one exit: the biggest goes first and takes the exit, the smaller
+    // ones branch off its belt (the other way round a big flow had to find a branch spot)
+    const byExit = new Map<string, number[]>();
+    connections.forEach((c, i) => c.from !== "import" && byExit.set(c.from.uid, [...(byExit.get(c.from.uid) ?? []), i]));
+    for (const slots of byExit.values()) {
+        if (slots.length < 2) continue;
+        const group = slots.map((i) => connections[i]).sort((a, b) => rank(a) - rank(b) || b.rate - a.rate);
+        slots.forEach((i, k) => (connections[i] = group[k]));
+    }
 
     let allowNewExit = false;
     for (const [done, conn] of connections.entries()) {
@@ -1056,7 +1081,12 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
 
         // The lane ends of this connection are reserved for it; free them for this search
         const own = [conn.from, conn.to].filter((e): e is LaneEnd => e !== "import" && e !== "export");
-        const ownPorts = own.flatMap((e) => [keyOf(e.port), keyOf(approach(e))]);
+        const ownUids = new Set(own.map((e) => e.uid));
+        // Its own way in or out always; the extra cell of a paired end only where no other end needs it
+        const ownPorts = [
+            ...own.flatMap((e) => [keyOf(e.port), keyOf(approach(e))]),
+            ...own.flatMap((e) => endCells(e).slice(2)).filter((k) => [...(keptBy.get(k) ?? [])].every((uid) => ownUids.has(uid))),
+        ];
         ownPorts.forEach((k) => reserved.delete(k));
 
         let goal: (cell: Cell, heading: Side) => Goal | null;

@@ -58,7 +58,8 @@ const isMachine = (p: Placement) => {
 const LIFT_IN = new Set(["conveyer-lift-upwards", "conveyer-lift-end-downwards"]);
 const LIFT_OUT = new Set(["conveyer-lift-end-upwards", "conveyer-lift-downwards"]);
 const PASS_THROUGH = new Set(["splitter-vert", "splitter-sym", "merger-vert", "merger-sym"]);
-const FERTILIZERS = new Set(items.filter((i) => (i as Item & { fertilizer_value?: number }).fertilizer_value || /fertilizer|growth potion/i.test(i.name)).map((i) => itemKey(i.name)));
+/** Anything with nutrients feeds a nursery (Panacea Elixir too, not only what is named fertilizer) */
+const FERTILIZERS = new Set(items.filter((i) => (i.nutrient_value ?? 0) > 0 || /fertilizer|growth potion/i.test(i.name)).map((i) => itemKey(i.name)));
 
 /** Recipe of a machine from what it is set to, or (machines that pick by input) from what reaches it */
 export type RecipeOf = (p: Placement, received: Set<string>) => MachineRecipe | undefined;

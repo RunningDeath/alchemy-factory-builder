@@ -5,6 +5,7 @@
  * load, or the ground); lab stands let lane belts underneath keep running.
  */
 import { buildOccupancy, cellKey, cellsCollide, placementCells, placementPorts, portTarget, type Placement } from "./layout";
+import { oppositeSide, SIDE_OFFSET } from "./footprint";
 import { transformBlock } from "./packing";
 import { findLaneEnds } from "./router";
 import { addToOccupancy, isSupported, removeFromOccupancy, supportColumn, type Occupancy } from "./supports";
@@ -90,7 +91,18 @@ function blockedEnds(placements: Placement[]): number {
         }
         return true;
     };
-    return findLaneEnds(placements).filter(({ port: [x, y, z] }) => {
+    // Two lane ends sharing the cell in front of them (an exit facing another block's entry):
+    // one belt takes it, the other has no way in or out
+    const ends = findLaneEnds(placements);
+    const frontOf = (e: (typeof ends)[number]): string[] => {
+        const [dx, dy] = SIDE_OFFSET[e.kind === "in" ? oppositeSide(e.dir) : e.dir];
+        return [e.port.join(","), [e.port[0] + dx, e.port[1] + dy, e.port[2]].join(",")];
+    };
+    const users = new Map<string, number>();
+    for (const e of ends) for (const c of frontOf(e)) users.set(c, (users.get(c) ?? 0) + 1);
+    return ends.filter((e) => {
+        const [x, y, z] = e.port;
+        if (frontOf(e).some((c) => users.get(c)! > 1)) return true;
         if (occupied.has(`${x},${y},${z}`)) return true;
         // Nothing but lab stands over the cell in front of a lane end: the belt comes in there
         if ((above.get(`${x},${y}`) ?? -1) > z) return true;
