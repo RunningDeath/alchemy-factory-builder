@@ -100,6 +100,8 @@ const PRIORITY_SPLITTER = "splitter-vert";
 const PRIORITY_MERGERS = ["merger", "merger-sym", "merger-vert"];
 /** Routing passes per layout: failed connections first in each next one */
 const ROUTE_PASSES = 6;
+/** Passes in a row without fewer failed connections than the best before giving up early */
+const STALE_PASSES = 2;
 /** Most cells a later pass adds to a connection's distance to vary the order */
 const ORDER_SHUFFLE = 20;
 /** How far from its exit a priority splitter may stand when it doesn't fit right there */
@@ -394,11 +396,17 @@ export function routeModule(placements: Placement[], options: RouterOptions): Ro
     let priority: string[] = [];
     const failed = (r: RoutingOutput) => r.routes.filter((x) => !x.ok);
     const passes = ROUTE_PASSES;
+    let stale = 0;
     for (let pass = 0; pass < passes; pass++) {
         const report = options.onProgress;
         const result = routeOnce(placements, { ...options, onProgress: report && ((f) => report((pass + f) / passes)) }, priority, pass);
-        if (!best || failed(result).length < failed(best).length) best = result;
+        if (!best || failed(result).length < failed(best).length) {
+            best = result;
+            stale = 0;
+        } else stale++;
         if (failed(best).length === 0) break;
+        // Passes that don't beat the best: the order shuffle isn't finding a way, stop trying
+        if (stale >= STALE_PASSES) break;
         priority = [...new Set([...failed(result).map((r) => r.key!), ...priority])];
     }
     best!.placements = trimDeadEnds(best!.placements, best!.io);

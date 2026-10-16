@@ -208,6 +208,8 @@ const PEER_FLOOR_SLACK = 1.1;
  * the same module on every machine
  */
 const WORK_BUDGET = 18_000_000;
+/** Share of the budget after which a block-shape variant without a working layout stops, once another has one */
+const DROP_FAILING_AFTER = 0.25;
 /** Past this many budgets the best layout so far is taken, belts routed or not */
 const HARD_LIMIT_FACTOR = 1;
 /**
@@ -1317,12 +1319,30 @@ function generateBlocks(allSteps: ModuleStep[], options: ModuleOptions, budget: 
         seen.add(key);
         return true;
     });
-    variants.forEach((levelLaneFloor, k) => {
-        const n = variants.length;
+    // The variants take turns, one layout at a time, the one that spent least going next: a
+    // variant whose layouts keep failing no longer uses up its whole budget before the other
+    // gets a try. Once one has a layout that works and the search has grown long, only
+    // variants with a working one go on (small modules still try everything: it's cheap)
+    const n = variants.length;
+    const runs = variants.map((levelLaneFloor, k) => {
         const onProgress = options.onProgress && ((f: number, label: string) => options.onProgress!((k + f) / n, label));
-        const result = generateBlocksWith(allSteps, { ...options, levelLaneFloor, onProgress }, budget / n, finish);
-        if (!best || score(result) < score(best)) best = result;
+        return { attempts: layoutAttempts(allSteps, { ...options, levelLaneFloor, onProgress }, budget / n, finish), best: null as GeneratedModule | null, work: 0, done: false };
     });
+    const works = (m: GeneratedModule | null) => !!m && brokenCount(m) === 0;
+    for (;;) {
+        const spentAll = runs.reduce((sum, r) => sum + r.work, 0);
+        const anyWorks = spentAll > budget * DROP_FAILING_AFTER && runs.some((r) => works(r.best));
+        const live = runs.filter((r) => !r.done && (!anyWorks || works(r.best)));
+        if (!live.length) break;
+        const run = live.reduce((a, b) => (b.work < a.work ? b : a));
+        const before = routingWork();
+        const next = run.attempts.next();
+        run.work += routingWork() - before;
+        if (next.value) run.best = next.value;
+        if (next.done) run.done = true;
+    }
+    for (const run of runs) if (run.best && (!best || score(run.best) < score(best))) best = run.best;
+    best!.locked = lockedBuildings(new Set(best!.placements.map((p) => p.id)), options.unlocks);
     options.onProgress?.(1, "Done");
     return best!;
 }
@@ -1403,7 +1423,8 @@ function buildBlocks(allSteps: ModuleStep[], options: ModuleOptions) {
     return { blocks, steps, can };
 }
 
-function generateBlocksWith(allSteps: ModuleStep[], options: ModuleOptions, budget: number, finish: boolean): GeneratedModule {
+/** Layouts for one variant of block shapes: yields the best so far after each, returns it at the end */
+function* layoutAttempts(allSteps: ModuleStep[], options: ModuleOptions, budget: number, finish: boolean): Generator<GeneratedModule | null, GeneratedModule, void> {
     const { blocks, steps, can } = buildBlocks(allSteps, options);
 
     // Production stage of each step: how many steps lie between it and the module's inputs
@@ -1498,8 +1519,9 @@ function generateBlocksWith(allSteps: ModuleStep[], options: ModuleOptions, budg
     const hardLimit = budget * HARD_LIMIT_FACTOR;
     const towerAttempts = attempts.filter(([c]) => c <= TOWER_MAX_CORRIDOR);
     const total = (towers.length < singles.length ? towerAttempts.length * (STACK_RETRIES + 1) : 0) + attempts.length;
-    const startWork = routingWork();
-    const spent = () => routingWork() - startWork;
+    // Its own routing effort only: other variants route between its layouts
+    let ownWork = 0;
+    const spent = () => ownWork;
     let attempt = 0;
     let retries = 0;
     // Stacked towers first. When some belts don't fit, only the blocks they belong to leave
@@ -1518,9 +1540,12 @@ function generateBlocksWith(allSteps: ModuleStep[], options: ModuleOptions, budg
             const base = attempt++;
             const onProgress = options.onProgress && ((f: number) => options.onProgress!(Math.min(0.99, (base + f) / total), label));
             onProgress?.(0);
+            const workBefore = routingWork();
             const result = layOut(blocks, set, setFlow, corridor, mode, { ...options, onProgress }, can, leftovers, finish);
+            ownWork += routingWork() - workBefore;
             if (!bestOfSet || score(result) < score(bestOfSet)) bestOfSet = result;
             if (!best || score(result) < score(best)) best = result;
+            yield best;
             // A belt between two blocks of the same tower fails whatever the layout around it:
             // take those blocks out of the towers right away instead of trying every layout
             if (stacked && retries < STACK_RETRIES && sameTowerFailures(result, set).size > 0) break;
