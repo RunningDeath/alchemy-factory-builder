@@ -40,6 +40,8 @@ export interface Placement {
     starterBox?: boolean;
     /** Plain pipes: the sides they connect ("top"/"base" for up and down) */
     pipeSides?: (Side | VerticalFace)[];
+    /** Internal: holds a pipe port's cell and column free while belts are routed (see reservePipeCells) */
+    pipeColumn?: boolean;
 }
 
 export interface WorldCell extends FootprintCell {

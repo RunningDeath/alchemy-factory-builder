@@ -23,7 +23,7 @@
 import { moduleIssues } from "./checks";
 import { beltPieceFor } from "./belt-pieces";
 import { footprintPorts, getFootprint, isDirectlyStackable, oppositeSide, rotatedSize, SIDE_OFFSET, STACKS_ON_ITSELF, type Rotation } from "./footprint";
-import { buildOccupancy, cellKey, placementCells, placementPorts, type Placement } from "./layout";
+import { buildOccupancy, cellKey, placementCells, placementPorts, validateLayout, type Placement } from "./layout";
 import { addToOccupancy, preferBlocks, pruneSupports, supportColumn, beamsUnderRuns } from "./supports";
 import { buildTowers, type Tower } from "./towers";
 import { attachDisposal, type Disposal } from "./disposal";
@@ -1596,10 +1596,11 @@ const brokenMemo = new WeakMap<GeneratedModule, number>();
 /**
  * What doesn't work in a layout: belts that couldn't be routed, heaters or pipe machines cut
  * off from their fluid, machines getting items they can't use or none of an input (checks.ts),
- * fail products looping back without a priority merger
+ * fail products looping back without a priority merger, and what the layout check finds
+ * (collisions, unsupported cells, a pipe stepping up or down under a lab stand)
  */
 function brokenCount(m: GeneratedModule): number {
-    if (!brokenMemo.has(m)) brokenMemo.set(m, m.routes.filter((r) => !r.ok || r.unprioritized).length + moduleIssues(m.placements, m.io).length);
+    if (!brokenMemo.has(m)) brokenMemo.set(m, m.routes.filter((r) => !r.ok || r.unprioritized).length + moduleIssues(m.placements, m.io).length + validateLayout(m.placements).length);
     return brokenMemo.get(m)!;
 }
 
@@ -1772,8 +1773,8 @@ function routeAndFinish(
 
     // The cell at each pipe port stays free of belts; the pipes come once the belts are in.
     // Reserved anew when modules are joined, so one fluid's network spans all of them
-    const withoutPipes = blockPlacements.filter((p) => p.id !== PIPE_ID);
-    blockPlacements = [...withoutPipes, ...reservePipeCells(withoutPipes, () => nextUid("pp"))];
+    const withoutPipes = blockPlacements.filter((p) => p.id !== PIPE_ID && !p.pipeColumn);
+    blockPlacements = [...withoutPipes, ...reservePipeCells(withoutPipes, () => nextUid("pp"), options.maxHeight)];
     // What starter boxes prime: self-made fertilizer, and self-made fuel whose own making
     // needs heat (coke powder from a heated crucible): the stoves need fuel before any is made
     const isBought = (item: string) => (options.boughtItems ?? []).includes(item);

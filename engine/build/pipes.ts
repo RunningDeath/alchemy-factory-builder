@@ -80,19 +80,81 @@ function pipePorts(placements: Placement[], cellFree: (x: number, y: number, z: 
     return ports;
 }
 
-/** Placeholders on the cells at the pipe ports, so belts leave them free (see layPipes) */
-export function reservePipeCells(placements: Placement[], makeUid: () => string): Placement[] {
+/** Cells held over a port: a step up and across past what blocks the way at its level (more would crowd the belts out) */
+const COLUMN_CELLS = 1;
+/** What holds a pipe port's column free while the belts are routed: blocks belts and lab stands, carries nothing (nothing may rest on a cell that goes again) */
+const COLUMN_HOLDER = "pipe-vertical";
+
+/**
+ * Placeholders on the cells at the pipe ports, so belts leave them free (see layPipes). Above
+ * each port a free column up to `maxHeight` is held too: a pipe going up or down needs a cell
+ * no lab stand shares (they only stand over level pipes), and the router would otherwise put
+ * supports there. One column per connection keeps the layout as compact as it is
+ */
+export function reservePipeCells(placements: Placement[], makeUid: () => string, maxHeight = Infinity): Placement[] {
     const occupancy = buildOccupancy(placements);
     const reserved = new Set<string>();
+    /** Nothing at all in the cell */
     const free = (x: number, y: number, z: number) => !occupancy.get(cellKey(x, y, z))?.length && !reserved.has(key(x, y, z));
-    const ports = pipePorts(placements, free);
+    // Ports as layPipes picks them: a pipe may share its cell with a lab stand (staying level there)
+    const pipeCell = footprintCells(getFootprint(PIPE_ID)!)[0];
+    const pipeFits = (x: number, y: number, z: number) => !reserved.has(key(x, y, z)) && !occupancy.get(cellKey(x, y, z))?.some((c) => cellsCollide(c, pipeCell));
+    const ports = pipePorts(placements, pipeFits);
     const out: Placement[] = [];
     const reserve = (x: number, y: number, z: number, resource: string) => {
         if (reserved.has(key(x, y, z))) return;
         reserved.add(key(x, y, z));
         out.push({ uid: makeUid(), id: PIPE_ID, x, y, z, rot: 0, pipeSides: [], label: resource });
     };
-    ports.forEach((port) => reserve(port.x, port.y, port.z, port.resource));
+    // A column cell: nothing may stand there while the belts are routed, a lab stand included
+    const hold = (x: number, y: number, z: number, resource: string) => {
+        reserved.add(key(x, y, z));
+        out.push({ uid: makeUid(), id: COLUMN_HOLDER, x, y, z, rot: 0, label: resource, pipeColumn: true });
+    };
+    // The cells where belts will join the blocks: in front of each open lane end and the one
+    // past it, with the cells under them. A column there would cut a block off
+    const laneCells = new Set<string>();
+    for (const p of placements) {
+        if (!p.laneEnd) continue;
+        for (const q of placementPorts(p)) {
+            if (q.medium !== "belt" || !SIDE_OFFSET[q.face as Side]) continue;
+            const [dx, dy] = SIDE_OFFSET[q.face as Side];
+            // Down to the ground too: a raised lane end's belt stands on supports there
+            for (let k = 1; k <= 2; k++) for (let z = 0; z <= q.z; z++) laneCells.add(key(q.x + dx * k, q.y + dy * k, z));
+        }
+    }
+    // Inside a block a column would stand in its lanes and lift shafts: only between blocks
+    const outlines = new Map<number, { minX: number; maxX: number; minY: number; maxY: number }>();
+    for (const p of placements) {
+        if (p.block === undefined) continue;
+        const o = outlines.get(p.block) ?? { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
+        o.minX = Math.min(o.minX, p.x);
+        o.maxX = Math.max(o.maxX, p.x);
+        o.minY = Math.min(o.minY, p.y);
+        o.maxY = Math.max(o.maxY, p.y);
+        outlines.set(p.block, o);
+    }
+    const inBlock = (x: number, y: number) => [...outlines.values()].some((o) => x >= o.minX && x <= o.maxX && y >= o.minY && y <= o.maxY);
+    const open = (x: number, y: number, z: number) => free(x, y, z) && !laneCells.has(key(x, y, z)) && !inBlock(x, y);
+    // How far a column from (x, y, z) rises through empty cells
+    const rise = (x: number, y: number, z: number) => {
+        let top = z;
+        while (top + 1 < maxHeight && top - z < COLUMN_CELLS && open(x, y, top + 1)) top++;
+        return top - z;
+    };
+    for (const port of ports) {
+        if (reserved.has(key(port.x, port.y, port.z))) continue;
+        // The column stands on an empty cell: the port's own if nothing is there, else one beside
+        // it (a lab stand in the port cell lets the pipe pass level, not turn up)
+        const spots = [[port.x, port.y], ...STEPS.filter(([, , dz]) => dz === 0).map(([dx, dy]) => [port.x + dx, port.y + dy])]
+            .filter(([x, y]) => open(x, y, port.z))
+            .map(([x, y]) => ({ x, y, up: rise(x, y, port.z) }));
+        const best = spots.length ? spots.reduce((a, b) => (b.up > a.up ? b : a)) : null;
+        const atPort = best && best.x === port.x && best.y === port.y;
+        if (!atPort) reserve(port.x, port.y, port.z, port.resource);
+        if (!best || best.up === 0) continue;
+        for (let z = port.z; z <= port.z + best.up; z++) hold(best.x, best.y, z, port.resource);
+    }
     // Ports of one fluid in a straight free line (heaters side by side): the pipe between them too
     for (const a of ports)
         for (const b of ports) {
@@ -113,7 +175,7 @@ const MAX_DIRECT_PIPE = 6;
  * ports join through free cells, low ones first; see the file comment
  */
 export function layPipes(input: Placement[], maxHeight: number, makeUid: () => string): Placement[] {
-    const placements = input.filter((p) => p.id !== PIPE_ID);
+    const placements = input.filter((p) => p.id !== PIPE_ID && !p.pipeColumn);
     const occupancy = buildOccupancy(placements);
     const cells = new Map<string, { resource: string; sides: Set<Side | VerticalFace> }>();
     // A pipe shares a cell with what leaves it room (a lab stand), not with a wood block or belt
