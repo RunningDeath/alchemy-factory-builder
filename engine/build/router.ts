@@ -108,6 +108,8 @@ const STALE_PASSES = 2;
 const ORDER_SHUFFLE = 20;
 /** How far from its exit a priority splitter may stand when it doesn't fit right there */
 const SPLITTER_LEAD = 3;
+/** Cells a priority merger may stand back from its entry, a straight belt leading on (it has two belts to take in) */
+const MERGER_LEAD = 8;
 
 /** Drawbridge conveyor: anchor post (3 high, needs support) and a 3-cell deck that needs none */
 const BRIDGE_ID = "draw-bridge";
@@ -865,33 +867,44 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
         const own = new Set([keyOf(entry.port), keyOf(approach(entry))]);
         const othersEnds = new Set(ends.filter((e) => e !== entry).flatMap((e) => [keyOf(e.port), keyOf(approach(e))]));
         const free = (c: Cell) => inBounds(c) && !nodes.has(keyOf(c)) && (own.has(keyOf(c)) || (!reserved.has(keyOf(c)) && !othersEnds.has(keyOf(c)))) && (occupancy.get(keyOf(c)) ?? []).every((o) => (o.layers & 7) === 0);
-        const rot = rotFor("left", dir);
-        for (let lead = 0; lead <= SPLITTER_LEAD; lead++) {
-            const leadCells: Cell[] = [];
-            let out = entry.port;
-            for (let i = 0; i < lead; i++) {
-                leadCells.push(out);
-                out = add(out, back);
+        // Where the merger can stand: straight back from the entry, or beside it, a corner belt in
+        // front of the entry taking its items in from the side (a block's lane often runs right
+        // behind an entry). Each with a few straight belts leading on
+        const paths: { cells: Cell[]; pieces: { ins: Side[]; outs: Side[] }[]; out: Cell; flow: Side }[] = [];
+        const along = (from: Cell, side: Side, n: number) => Array.from({ length: n }, (_, i) => Array.from({ length: i + 1 }).reduce<Cell>((c) => add(c, side), from));
+        for (let lead = 0; lead <= MERGER_LEAD; lead++) {
+            const cells = [entry.port, ...along(entry.port, back, lead - 1)].slice(0, lead);
+            paths.push({ cells, pieces: cells.map(() => ({ ins: [back], outs: [dir] })), out: lead ? add(cells[cells.length - 1], back) : entry.port, flow: dir });
+        }
+        for (const side of [rotateSide(dir, 1), rotateSide(dir, 3)])
+            for (let k = 0; k < MERGER_LEAD; k++) {
+                const cells = [entry.port, ...along(entry.port, side, k)];
+                const pieces = cells.map((_, i) => (i === 0 ? { ins: [side], outs: [dir] } : { ins: [side], outs: [oppositeSide(side)] }));
+                paths.push({ cells, pieces, out: add(cells[cells.length - 1], side), flow: oppositeSide(side) });
             }
+        for (const path of paths) {
+            const leadCells = path.cells;
+            const out = path.out;
+            const rot = rotFor("left", path.flow);
             for (const id of PRIORITY_MERGERS) {
-                // Placed so its output port's cell is `out`, facing the entry
+                // Placed so its output port's cell is `out`, facing along the path
                 const trial: Placement = { uid: "trial", id, x: 0, y: 0, z: 0, rot };
-                const [outPort, priorityPort, otherPort] = placementPorts(trial);
+                const [outPort] = placementPorts(trial);
                 const at: Placement = { ...trial, x: out[0] - outPort.x, y: out[1] - outPort.y, z: out[2] - outPort.z };
                 const cells = placementCells(at).map((c): Cell => [c.x, c.y, c.z]);
                 if (![...leadCells, ...cells].every(free)) continue;
                 const ports = placementPorts(at);
                 const inputs = [ports[1], ports[2]];
-                void priorityPort;
-                void otherPort;
                 // Room for the two belts coming in
                 const feeds = inputs.map((q) => portTarget(q) as Cell);
                 if (!feeds.every(free)) continue;
                 const base = [...leadCells, ...cells.filter((c) => c[2] === out[2])];
                 if (!base.every((c) => supportCost(occupancy, c[0], c[1], c[2]) !== null)) continue;
                 const placement: Placement = { ...at, uid: makeUid("pm"), label: itemName, lane: "route" };
-                const piece = beltPieceFor([back], [dir])!;
-                const belts: Placement[] = leadCells.map((c) => ({ uid: makeUid("b"), id: piece.id, x: c[0], y: c[1], z: c[2], rot: piece.rot, label: itemName, lane: "route" }));
+                const belts: Placement[] = leadCells.map((c, i) => {
+                    const piece = beltPieceFor(path.pieces[i].ins, path.pieces[i].outs)!;
+                    return { uid: makeUid("b"), id: piece.id, x: c[0], y: c[1], z: c[2], rot: piece.rot, label: itemName, lane: "route" };
+                });
                 const endAt = (k: number, suffix: string, items: LaneEnd["items"]): LaneEnd => ({
                     uid: `${placement.uid}:${suffix}`,
                     kind: "in",
@@ -1152,6 +1165,9 @@ function routeOnce(placements: Placement[], options: RouterOptions, priority: st
             if (!connected) reserveEnd(e);
         }
         // Surplus that finds no way to a consumer just stays where it is (it was optional)
+        // Its ends' cells were freed for its search: held again where its belt didn't take them, so
+        // later belts don't cut off an entry that still waits for more (or for this one, failed)
+        ownPorts.forEach((k) => !nodes.has(k) && reserved.add(k));
         if (ok || !conn.surplus) routes.push({ itemName: conn.itemName, from: endName(conn.from), to: endName(conn.to), rate: conn.rate, ok, key: connKey(conn), ...(!ok && { reason: found ? "commit" : lastFailure }), ...(conn.unprioritized && { unprioritized: true }) });
     }
 

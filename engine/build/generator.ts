@@ -23,7 +23,7 @@
 import { moduleIssues } from "./checks";
 import { beltPieceFor } from "./belt-pieces";
 import { footprintPorts, getFootprint, isDirectlyStackable, oppositeSide, rotatedSize, SIDE_OFFSET, STACKS_ON_ITSELF, type Rotation } from "./footprint";
-import { buildOccupancy, cellKey, placementCells, placementPorts, validateLayout, type Placement } from "./layout";
+import { buildOccupancy, cellKey, placementCells, placementPorts, validateLayout, type Placement, type WorldCell } from "./layout";
 import { addToOccupancy, preferBlocks, pruneSupports, supportColumn, beamsUnderRuns } from "./supports";
 import { buildTowers, type Tower } from "./towers";
 import { attachDisposal, type Disposal } from "./disposal";
@@ -747,6 +747,7 @@ function buildTier(
     // A straight belt in front of each output off the lanes, its end open for the router;
     // inside the block's outline only (outside it neighbours would collide)
     const taken = buildOccupancy([...placements, ...lifts, ...belts]);
+    const raisedIns: { stub: Placement; face: Side }[] = [];
     for (const port of [...offLaneOuts, ...offLaneIns]) {
         const face = port.face as Side;
         if (!SIDE_OFFSET[face]) {
@@ -773,7 +774,9 @@ function buildTier(
         };
         addToOccupancy(taken, stub);
         belts.push(stub);
+        if (input) raisedIns.push({ stub, face });
     }
+    belts.push(...joinRaisedInputs(raisedIns, taken, beltSpeed, step.nodeKey));
 
     placements.push(...lifts);
     placements.push(...belts);
@@ -823,6 +826,77 @@ function buildTier(
             mixedInputs: step.inputs.length >= 2 && !feed.separate,
         },
     };
+}
+
+/**
+ * Raised-only inputs (iron smelters take their ore at the top) side by side at one height
+ * joined into one raised lane with a single entry, as far as one belt carries: else each
+ * machine got a belt of its own, with its own lift and supports. The lane runs along the
+ * stubs (past free cells between them) and hands items to each machine on the way. Changes
+ * the stubs in place; returns the belts between them
+ */
+function joinRaisedInputs(stubs: { stub: Placement; face: Side }[], taken: Map<number, WorldCell[]>, beltSpeed: number, nodeKey: string): Placement[] {
+    const added: Placement[] = [];
+    const groups = new Map<string, { stub: Placement; face: Side }[]>();
+    for (const e of stubs) {
+        // Ports facing left or right line up along y, up or down along x
+        const alongY = e.face === "left" || e.face === "right";
+        const key = `${e.face}|${e.stub.z}|${alongY ? e.stub.x : e.stub.y}`;
+        groups.set(key, [...(groups.get(key) ?? []), e]);
+    }
+    const rate = (p: Placement) => p.laneEnd!.items.reduce((sum, i) => sum + i.rate, 0);
+    for (const list of groups.values()) {
+        if (list.length < 2) continue;
+        const face = list[0].face;
+        const alongY = face === "left" || face === "right";
+        const pos = (p: Placement) => (alongY ? p.y : p.x);
+        const cell = (k: number): [number, number] => (alongY ? [list[0].stub.x, k] : [k, list[0].stub.y]);
+        const z = list[0].stub.z;
+        const own = new Set(list.map((e) => e.stub.uid));
+        const free = (k: number) => (taken.get(cellKey(...cell(k), z)) ?? []).every((c) => own.has(c.uid));
+        list.sort((a, b) => pos(a.stub) - pos(b.stub));
+        // Runs that fit on one belt, without a taken cell between two stubs
+        const runs: (typeof list)[] = [];
+        for (const e of list) {
+            const run = runs[runs.length - 1];
+            const last = run?.[run.length - 1];
+            const fits = run && run.reduce((sum, r) => sum + rate(r.stub), 0) + rate(e.stub) <= beltSpeed + 1e-6;
+            const clear = last && Array.from({ length: pos(e.stub) - pos(last.stub) - 1 }, (_, k) => pos(last.stub) + 1 + k).every(free);
+            if (run && fits && clear) run.push(e);
+            else runs.push([e]);
+        }
+        const back: Side = alongY ? "up" : "left";
+        const ahead: Side = alongY ? "down" : "right";
+        const into = oppositeSide(face);
+        for (const run of runs) {
+            if (run.length < 2) continue;
+            const first = pos(run[0].stub);
+            const last = pos(run[run.length - 1].stub);
+            // The lane's entry takes its items from the cell before it: that one must be free too
+            if (!free(first - 1) || (taken.get(cellKey(...cell(first - 1), z)) ?? []).length) continue;
+            const items = run[0].stub.laneEnd!.items.map((it) => ({ itemName: it.itemName, rate: run.reduce((sum, e) => sum + (e.stub.laneEnd!.items.find((x) => x.itemName === it.itemName)?.rate ?? 0), 0) }));
+            const at = new Map(run.map((e) => [pos(e.stub), e.stub]));
+            for (let k = first; k <= last; k++) {
+                const outs: Side[] = [];
+                if (at.has(k)) outs.push(into);
+                if (k < last) outs.push(ahead);
+                const piece = beltPieceFor([back], outs) ?? beltPieceFor([back], [ahead])!;
+                const stub = at.get(k);
+                if (stub) {
+                    stub.id = piece.id;
+                    stub.rot = piece.rot;
+                    delete stub.laneEnd;
+                    if (k === first) stub.laneEnd = { kind: "in", items };
+                } else {
+                    const [x, y] = cell(k);
+                    const belt: Placement = { uid: nextUid("b"), id: piece.id, x, y, z, rot: piece.rot, nodeKey, lane: "in", label: items.map((i) => i.itemName).join(" + ") };
+                    addToOccupancy(taken, belt);
+                    added.push(belt);
+                }
+            }
+        }
+    }
+    return added;
 }
 
 /**
