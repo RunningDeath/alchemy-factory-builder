@@ -1,12 +1,13 @@
 "use client";
 
-import { Download, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Download, FolderInput, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import itemsData from "../../data/items.json";
 import { exportBlueprint, randomBlueprintId } from "../../engine/build/blueprint";
 import { getFootprint } from "../../engine/build/footprint";
 import { placementCells, type Placement } from "../../engine/build/layout";
 import type { Item } from "../../engine/types";
+import { canSaveToFolder, forgetFolder, GAME_BLUEPRINT_FOLDER, pickFolder, savedFolder, saveToFolder } from "../../lib/blueprintFolder";
 import { placementColor } from "../../lib/buildCatalog";
 
 interface ExportBlueprintDialogProps {
@@ -73,24 +74,51 @@ export function ExportBlueprintDialog({ placements, itemColors, defaultTitle, ma
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [title, setTitle] = useState(defaultTitle);
     const [description, setDescription] = useState("");
-    const [result, setResult] = useState<{ file: string; buildings: number; warnings: string[] } | null>(null);
+    const [result, setResult] = useState<{ file: string; buildings: number; warnings: string[]; folder?: string } | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const fileId = useMemo(() => randomBlueprintId(), []);
+    /** The browser can write into a folder (Chrome, Edge), and the game folder picked before */
+    // The dialog only opens on a click, in the browser, so the check can run at once
+    const [direct] = useState(canSaveToFolder);
+    const [folder, setFolder] = useState<string | null>(null);
 
     useEffect(() => {
         if (canvasRef.current) drawPreview(canvasRef.current, placements, itemColors);
     }, [placements, itemColors]);
 
+    useEffect(() => {
+        savedFolder().then((h) => setFolder(h?.name ?? null));
+    }, []);
+
+    const build = async () => {
+        const png = await canvasPng(canvasRef.current!);
+        return exportBlueprint(
+            placements,
+            { title: title.trim() || defaultTitle, description: description.trim(), itemName: mainItem ? itemIdByName.get(mainItem) : undefined },
+            png,
+        );
+    };
+
+    /** Straight into the game's blueprint folder (picked once, remembered) */
+    const handleSaveToGame = async (choose: boolean) => {
+        setError(null);
+        try {
+            const exported = await build();
+            const handle = (!choose && (await savedFolder())) || (await pickFolder());
+            setFolder(handle.name);
+            const file = await saveToFolder(handle, `${randomBlueprintId()}.png`, exported.bytes);
+            setResult({ file, buildings: exported.buildingCount, warnings: exported.warnings, folder: handle.name });
+        } catch (e) {
+            // Closing the folder picker isn't an error
+            if (e instanceof DOMException && e.name === "AbortError") return;
+            setError(e instanceof Error ? e.message : String(e));
+        }
+    };
+
     const handleExport = async () => {
         setError(null);
         try {
-            const png = await canvasPng(canvasRef.current!);
-            const exported = exportBlueprint(
-                placements,
-                { title: title.trim() || defaultTitle, description: description.trim(), itemName: mainItem ? itemIdByName.get(mainItem) : undefined },
-                png,
-            );
-            const file = `${fileId}.png`;
+            const exported = await build();
+            const file = `${randomBlueprintId()}.png`;
             const url = URL.createObjectURL(new Blob([exported.bytes as BlobPart], { type: "image/png" }));
             const a = document.createElement("a");
             a.href = url;
@@ -133,19 +161,45 @@ export function ExportBlueprintDialog({ placements, itemColors, defaultTitle, ma
                     </p>
                 )}
 
-                <button
-                    onClick={handleExport}
-                    className="self-start px-3 py-1.5 rounded-md flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider cursor-pointer border border-[var(--accent-gold-dim)] text-[var(--accent-gold)] hover:bg-[var(--accent-gold)]/10"
-                >
-                    <Download size={13} /> Download blueprint
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                    {direct && (
+                        <button
+                            onClick={() => handleSaveToGame(false)}
+                            className="px-3 py-1.5 rounded-md flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider cursor-pointer border border-[var(--accent-gold-dim)] text-[var(--accent-gold)] hover:bg-[var(--accent-gold)]/10"
+                            title={folder ? `Save into ${folder}` : "Pick the game's blueprint folder, then save into it"}
+                        >
+                            <FolderInput size={13} /> Save to game
+                        </button>
+                    )}
+                    <button
+                        onClick={handleExport}
+                        className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider cursor-pointer border ${direct ? "border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]" : "border-[var(--accent-gold-dim)] text-[var(--accent-gold)] hover:bg-[var(--accent-gold)]/10"}`}
+                    >
+                        <Download size={13} /> Download
+                    </button>
+                </div>
+                {direct && folder && (
+                    <p className="text-[11px] text-[var(--text-muted)]">
+                        Saving into folder <code className="text-[var(--text-secondary)]">{folder}</code> ·{" "}
+                        <button onClick={() => handleSaveToGame(true)} className="underline cursor-pointer hover:text-[var(--text-primary)]">
+                            change
+                        </button>{" "}
+                        ·{" "}
+                        <button onClick={() => forgetFolder().then(() => setFolder(null))} className="underline cursor-pointer hover:text-[var(--text-primary)]">
+                            forget
+                        </button>
+                    </p>
+                )}
 
                 {error && <p className="text-[var(--error)]">{error}</p>}
                 {result && (
                     <div className="flex flex-col gap-1 text-[var(--text-secondary)]">
                         <p className="text-[var(--success)]">
-                            Saved {result.file} ({result.buildings} buildings).
+                            Saved {result.file} ({result.buildings} buildings){result.folder ? ` into ${result.folder}` : ""}.
                         </p>
+                        {result.folder && result.folder !== "Blueprints" && (
+                            <p className="text-[var(--warning)]">That folder isn&apos;t named Blueprints: the game only reads {GAME_BLUEPRINT_FOLDER}.</p>
+                        )}
                         {result.warnings.map((w, i) => (
                             <p key={i} className="text-[var(--warning)]">
                                 {w}
@@ -155,10 +209,20 @@ export function ExportBlueprintDialog({ placements, itemColors, defaultTitle, ma
                 )}
 
                 <div className="text-[11px] text-[var(--text-muted)] flex flex-col gap-1 border-t border-[var(--border)] pt-2">
-                    <p>
-                        Put the file into <code className="text-[var(--text-secondary)]">%LOCALAPPDATA%\AlchemyFactory\Saved\Blueprints\</code> and
-                        restart the game; it then shows up in your blueprint list.
-                    </p>
+                    {direct ? (
+                        <p>
+                            <b>Save to game</b> asks once for the game&apos;s blueprint folder,{" "}
+                            <code className="text-[var(--text-secondary)]">{GAME_BLUEPRINT_FOLDER}</code> (paste that into the folder
+                            dialog&apos;s address bar), and saves there from then on. Restart the game; the blueprint then shows up in your list.
+                        </p>
+                    ) : (
+                        <p>
+                            Put the file into <code className="text-[var(--text-secondary)]">{GAME_BLUEPRINT_FOLDER}\</code> and restart the
+                            game; it then shows up in your blueprint list. Chrome and Edge can save it there directly. In Firefox, turn on
+                            Settings → Downloads → &quot;Always ask you where to save files&quot; and pick that folder once: Firefox opens the
+                            save dialog there from then on.
+                        </p>
+                    )}
                     <p>Keep a copy of that folder first. Exported blueprints are new; tell us if one doesn&apos;t load.</p>
                 </div>
             </div>
