@@ -461,3 +461,57 @@ describe("athanor fail products", () => {
     expect(validateLayout(mod.placements)).toEqual([]);
   });
 });
+
+describe("cauldron rows and machine columns", () => {
+  const clay = step({
+    nodeKey: "clay",
+    itemName: "Clay",
+    deviceId: "cauldron",
+    machines: 8,
+    inputs: [
+      { itemName: "Redcurrant", perMachineRate: 40 },
+      { itemName: "Sage", perMachineRate: 40 },
+      { itemName: "Sage Powder", perMachineRate: 40 },
+    ],
+    outputs: [{ itemName: "Clay", perMachineRate: 40 }],
+    heating: { kind: "steam", fuelItem: "Steam", fuelRate: 60 },
+  });
+
+  test("cauldrons of one level share a lane per item in front and behind; each lane carries one item", () => {
+    const mod = generateModule([clay], options);
+    expect(validateLayout(mod.placements)).toEqual([]);
+    expect(mod.routes.every((r) => r.ok)).toBe(true);
+    expect(moduleIssues(mod.placements, mod.io)).toEqual([]);
+    const cauldrons = mod.placements.filter((p) => p.id === "cauldron");
+    // Lane entries: one per level and lane side, not one per cauldron port
+    const entries = mod.placements.filter((p) => p.laneEnd?.kind === "in" && p.nodeKey === "clay");
+    const levels = new Set(cauldrons.map((c) => c.z)).size;
+    expect(entries.length).toBeLessThan(cauldrons.length * 3);
+    expect(entries.length).toBe(cauldrons.length + levels * 2);
+    expect(entries.every((e) => e.laneEnd!.items.length === 1)).toBe(true);
+  });
+
+  test("table saws stack in columns on beam decks, fed by lifts in front and behind", () => {
+    const mod = generateModule(
+      [
+        step({
+          nodeKey: "plank",
+          itemName: "Plank",
+          deviceId: "table-saw",
+          machines: 6,
+          inputs: [{ itemName: "Logs", perMachineRate: 0.4 }],
+          outputs: [{ itemName: "Plank", perMachineRate: 77 }],
+        }),
+      ],
+      options,
+    );
+    expect(validateLayout(mod.placements)).toEqual([]);
+    expect(mod.routes.every((r) => r.ok)).toBe(true);
+    expect(moduleIssues(mod.placements, mod.io)).toEqual([]);
+    const saws = mod.placements.filter((p) => p.id === "table-saw");
+    // Two per column (two outputs fill a belt), so half of them stand on a deck
+    expect(saws.filter((s) => s.z > 0)).toHaveLength(3);
+    expect(mod.placements.some((p) => p.id === "beam5")).toBe(true);
+    expect(unconnectedMachinePorts(mod)).toEqual([]);
+  });
+});

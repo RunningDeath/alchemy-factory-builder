@@ -1260,11 +1260,31 @@ function laneInfo(kind: "in" | "out", x: number, level: number, z: number, flows
 }
 
 /**
- * Cauldron columns: left in-stub, cauldron, out-stub and two free columns, one for the lifts
- * down from the outputs, one for the next column's lifts up to its left inputs (with one,
- * an output ran straight into the neighbour's input or the lifts got in each other's way)
+ * Cauldron columns: left in-stub, cauldron, out-stub and at least two free columns, one for
+ * the lifts down from the outputs, one for the next column's lifts up to its left inputs
+ * (with one, an output ran straight into the neighbour's input or the lifts got in each
+ * other's way)
  */
 const CAULDRON_PITCH = 7;
+const CAULDRON_BODY = 5;
+
+/**
+ * Shared lanes along the rows: for cauldrons with ports in front and behind, once a row has
+ * two of them to share a lane (a single column keeps its belt per port)
+ */
+function cauldronLanes(fp: BuildingFootprint, columns: number): boolean {
+    const port = (face: Side) => fp.ports.some((p) => p.medium === "belt" && p.dir === "in" && p.face === face);
+    return columns >= 2 && port("up") && port("down");
+}
+
+/**
+ * Column pitch for cauldrons stacked `levels` high. With the shared lanes in front and behind
+ * the gap between two columns is closed at each level and only its 3 rows are left: an output
+ * down and the next column's left input up per level have to fit there, 2 lifts per level
+ */
+function cauldronPitch(fp: BuildingFootprint, levels: number, columns: number): number {
+    return cauldronLanes(fp, columns) ? Math.max(CAULDRON_PITCH, CAULDRON_BODY + Math.ceil((2 * levels) / fp.size.y)) : CAULDRON_PITCH;
+}
 
 /**
  * Cauldrons, laid out like players build them: a row of columns, each on its own
@@ -1298,11 +1318,29 @@ function buildCauldronTier(step: ModuleStep, count: number, fp: BuildingFootprin
         for (let k = 0; k < ports && portItems.length < inPorts.length; k++) portItems.push({ itemName: f.itemName, perMachineRate: f.perMachineRate / ports });
     }
 
+    // Every port takes any of the cauldron's items, so the front and back ports of one level
+    // share a lane per item along the row (one item per belt, split at each cauldron); the
+    // left ports sit between the columns, where no lane passes, and keep a belt each. The
+    // biggest flows go on the lanes
+    const front = inSides.findIndex((s) => s.side === "up");
+    const back = inSides.findIndex((s) => s.side === "down");
+    const shared = new Set<number>();
+    if (cauldronLanes(fp, columns) && front >= 0 && back >= 0 && portItems.length === inPorts.length) {
+        const byRate = [...portItems].sort((a, b) => b.perMachineRate - a.perMachineRate);
+        const rest = inSides.map((_, k) => k).filter((k) => k !== front && k !== back);
+        portItems[front] = byRate[0];
+        portItems[back] = byRate[1];
+        rest.forEach((k, i) => (portItems[k] = byRate[2 + i]));
+        shared.add(front).add(back);
+    }
+    /** Cauldron x per level, left to right (columns fill bottom up) */
+    const rowXs = new Map<number, number[]>();
+
     const placements: Placement[] = [];
     const stubs: Placement[] = [];
     let placed = 0;
     for (let col = 0; col < columns && placed < count; col++) {
-        const x = origin.x + 1 + col * CAULDRON_PITCH;
+        const x = origin.x + 1 + col * cauldronPitch(fp, levels, columns);
         const y = origin.y + 1;
         const heater: Placement = { uid: nextUid("h"), id: steam ? STEAM_HEATER_ID : STOVE_ID, x, y, z: 0, rot: 0 };
         if (steam) heater.pipeEnd = { kind: "in", items: [{ itemName: heating.fuelItem, rate: heating.fuelRate / columns }] };
@@ -1318,7 +1356,9 @@ function buildCauldronTier(step: ModuleStep, count: number, fp: BuildingFootprin
         for (let level = 0; level < levels && placed < count; level++, placed++) {
             const z = baseZ + level * pitch;
             placements.push({ uid: nextUid("m"), id: step.deviceId, x, y, z, rot: 0, nodeKey: step.nodeKey, label: step.itemName });
+            rowXs.set(level, [...(rowXs.get(level) ?? []), x]);
             portItems.forEach((flow, k) => {
+                if (shared.has(k)) return;
                 const { side, dx, dy, dz } = inSides[k];
                 // The stub sits on the port's side and runs into the cauldron
                 const piece = beltPieceFor([side], [oppositeSide(side)])!;
@@ -1335,12 +1375,44 @@ function buildCauldronTier(step: ModuleStep, count: number, fp: BuildingFootprin
             });
         }
     }
+    // The shared lanes: along the row in front of (or behind) the ports, entered from outside
+    // the block at the first cauldron, split into each port on the way; a row whose items
+    // don't fit on one belt gets a lane per group of cauldrons
+    for (const k of shared) {
+        const flow = portItems[k];
+        const { side, dx, dy, dz } = inSides[k];
+        const into = oppositeSide(side);
+        for (const [level, xs] of rowXs) {
+            const z = baseZ + level * pitch + dz;
+            const groups: number[][] = [];
+            for (const x of xs) {
+                const last = groups[groups.length - 1];
+                if (last && (last.length + 1) * flow.perMachineRate <= opts.beltSpeed + 1e-6) last.push(x);
+                else groups.push([x]);
+            }
+            for (const group of groups) {
+                const ports = new Set(group.map((x) => x + dx));
+                const first = group[0] + dx;
+                const end = group[group.length - 1] + dx;
+                for (let cx = first; cx <= end; cx++) {
+                    const outs: Side[] = [];
+                    if (ports.has(cx)) outs.push(into);
+                    if (cx < end) outs.push("right");
+                    const ins: Side[] = [cx === first ? side : "left"];
+                    const piece = beltPieceFor(ins, outs) ?? beltPieceFor(ins, ["right"])!;
+                    const belt: Placement = { uid: nextUid("b"), id: piece.id, x: cx, y: origin.y + 1 + dy, z, rot: piece.rot, lane: "in", label: flow.itemName, nodeKey: step.nodeKey };
+                    if (cx === first) belt.laneEnd = { kind: "in", items: [{ itemName: flow.itemName, rate: flow.perMachineRate * group.length }] };
+                    stubs.push(belt);
+                }
+            }
+        }
+    }
     placements.push(...stubs);
     const occupancy = buildOccupancy(placements);
     const makeUid = () => nextUid("f");
     for (const b of [...stubs].filter((s) => s.z > 0).sort((a, c) => a.z - c.z)) placements.push(...supportColumn(occupancy, b.x, b.y, b.z, 0, makeUid));
 
-    const width = 1 + columns * CAULDRON_PITCH;
+    const width = 1 + columns * cauldronPitch(fp, levels, columns);
     const depth = 5;
     // Every cauldron has a belt per input and one out (the rates are per cauldron)
     const lanes: LaneInfo[] = [
@@ -1381,6 +1453,180 @@ function buildCauldronTier(step: ModuleStep, count: number, fp: BuildingFootprin
     };
 }
 
+interface DeckColumns {
+    rot: Rotation;
+    levels: number;
+    beamId: string;
+    /** Machine size turned (across and along the column) */
+    w: number;
+    d: number;
+    /** Input and output port x in the turned machine */
+    inX: number;
+    outX: number;
+}
+
+/** Lift slots beside a column's port: one level each */
+const DECK_LIFT_SLOTS = 2;
+
+/**
+ * Machines without a deck in the usual orientation (a table saw is 4 long, no beam fits
+ * across it from lane to lane) stack the way players build them: turned so items enter at
+ * the front and leave at the back, 3 wide, on beams laid across a column one cell wider on
+ * each side. Upper levels get their items by a lift in the front row and send them down by
+ * one in the back row, so a column is as high as one output belt carries (and the lift
+ * slots beside the port allow)
+ */
+function deckColumnsFor(step: ModuleStep, fp: BuildingFootprint, opts: ModuleOptions, can: Capabilities): DeckColumns | null {
+    if (step.heating || hasPipes(step.deviceId) || step.deviceId === PURCHASING_PORTAL || !can.lifts || !can.beams) return null;
+    if (step.inputs.length !== 1 || step.outputs.length !== 1) return null;
+    if (stackingFor(fp, machineRotation(fp)).kind !== "none") return null;
+    const belts = fp.ports.filter((p) => p.medium === "belt");
+    if (belts.length !== 2) return null;
+    for (const rot of [0, 1, 2, 3] as Rotation[]) {
+        const ports = footprintPorts(fp, rot).filter((p) => p.medium === "belt");
+        const inPort = ports.find((p) => p.dir === "in" && p.face === "up" && p.z === 0);
+        const outPort = ports.find((p) => p.dir === "out" && p.face === "down" && p.z === 0);
+        if (!inPort || !outPort) continue;
+        const { x: w, y: d } = rotatedSize(fp, rot);
+        const beam = BEAMS.find(([length]) => length === w + 2);
+        if (!beam || !getFootprint(beam[1])) return null;
+        // Lift slots right beside the port, inside the column
+        const slots = (x: number) => [x - 1, x + 1].filter((s) => s >= 0 && s < w).length;
+        const pitch = fp.size.z + 1;
+        const levels = Math.min(
+            1 + Math.min(DECK_LIFT_SLOTS, slots(inPort.x), slots(outPort.x)),
+            opts.maxStack,
+            Math.floor((opts.maxHeight - fp.size.z) / pitch) + 1,
+            Math.floor((opts.beltSpeed + 1e-6) / step.outputs[0].perMachineRate),
+            Math.floor((opts.beltSpeed + 1e-6) / step.inputs[0].perMachineRate),
+        );
+        return levels >= 2 ? { rot, levels, beamId: beam[1], w, d, inX: inPort.x, outX: outPort.x } : null;
+    }
+    return null;
+}
+
+function buildDeckColumns(step: ModuleStep, count: number, fp: BuildingFootprint, plan: DeckColumns, origin: { x: number; y: number; z: number }, index: number, opts: ModuleOptions) {
+    const { rot, w, d, inX, outX, beamId } = plan;
+    const levels = Math.min(plan.levels, count);
+    const columns = Math.ceil(count / levels);
+    const pitch = fp.size.z + 1;
+    const nodeKey = step.nodeKey;
+    const input = step.inputs[0];
+    const output = step.outputs[0];
+    const inRow = origin.y;
+    const outRow = origin.y + 1 + d;
+    const placements: Placement[] = [];
+    const belts: Placement[] = [];
+    const decks: Placement[] = [];
+    const lift = (x: number, y: number, fromZ: number, toZ: number, from: Side, to: Side, label: string, up: boolean) => {
+        for (let lz = Math.min(fromZ, toZ); lz <= Math.max(fromZ, toZ); lz++) {
+            const bottom = lz === Math.min(fromZ, toZ);
+            const top = lz === Math.max(fromZ, toZ);
+            const id = bottom ? (up ? "conveyer-lift-upwards" : "conveyer-lift-downwards") : top ? (up ? "conveyer-lift-end-upwards" : "conveyer-lift-end-downwards") : "conveyer-lift-body";
+            // Up: in at the bottom, out at the top; down the other way round
+            const rotation = bottom ? rotFor("left", up ? from : to) : top ? rotFor("down", up ? to : from) : 0;
+            placements.push({ uid: nextUid("l"), id, x, y, z: lz, rot: rotation, nodeKey, lane: up ? "in" : "out", label });
+        }
+    };
+    const belt = (x: number, y: number, z: number, ins: Side[], outs: Side[], lane: "in" | "out", label: string) => {
+        const piece = beltPieceFor(ins, outs)!;
+        const b: Placement = { uid: nextUid("b"), id: piece.id, x, y, z, rot: piece.rot, nodeKey, lane, label };
+        belts.push(b);
+        return b;
+    };
+    /** Front row cells taking items from the header above, and their rates */
+    const entries: { x: number; rate: number }[] = [];
+    let placed = 0;
+    for (let col = 0; col < columns && placed < count; col++) {
+        const x0 = origin.x + col * (w + 2);
+        const inPortX = x0 + 1 + inX;
+        const outPortX = x0 + 1 + outX;
+        const inSlots = [inPortX - 1, inPortX + 1];
+        const outSlots = [outPortX - 1, outPortX + 1];
+        const here = Math.min(levels, count - placed);
+        const outIns: Side[] = ["up"];
+        for (let level = 0; level < here; level++, placed++) {
+            const z = origin.z + level * pitch;
+            placements.push({ uid: nextUid("m"), id: step.deviceId, x: x0 + 1, y: origin.y + 1, z, rot, nodeKey, label: step.itemName });
+            if (level === 0) {
+                belt(inPortX, inRow, z, ["up"], ["down"], "in", input.itemName);
+                entries.push({ x: inPortX, rate: input.perMachineRate });
+                continue;
+            }
+            // The deck: one beam per machine row, across the column
+            for (let r = 0; r < d; r++) decks.push({ uid: nextUid("d"), id: beamId, x: x0, y: origin.y + 1 + r, z: z - 1, rot: 1 });
+            // In: up by a lift beside the port, then into it
+            const inSlot = inSlots[level - 1];
+            const toPort: Side = inSlot < inPortX ? "right" : "left";
+            lift(inSlot, inRow, origin.z, z, "up", toPort, input.itemName, true);
+            belt(inPortX, inRow, z, [oppositeSide(toPort)], ["down"], "in", input.itemName);
+            entries.push({ x: inSlot, rate: input.perMachineRate });
+            // Out: aside to a lift down, which hands it to the bottom machine's output belt
+            const outSlot = outSlots[level - 1];
+            const toSlot: Side = outSlot < outPortX ? "left" : "right";
+            belt(outPortX, outRow, z, ["up"], [toSlot], "out", output.itemName);
+            lift(outSlot, outRow, z, origin.z, oppositeSide(toSlot), oppositeSide(toSlot), output.itemName, false);
+            outIns.push(toSlot);
+        }
+        // The bottom output takes the lifts' items in and leaves at the back
+        const out = belt(outPortX, outRow, origin.z, outIns, ["down"], "out", output.itemName);
+        out.laneEnd = { kind: "out", items: [{ itemName: output.itemName, rate: output.perMachineRate * here }] };
+    }
+    // One header in the free row in front feeds every entry, split where one belt can't carry it all
+    const y = inRow - 1;
+    let segment: typeof entries = [];
+    const flush = () => {
+        if (!segment.length) return;
+        const xs = new Set(segment.map((e) => e.x));
+        const first = segment[0].x;
+        const last = segment[segment.length - 1].x;
+        for (let x = first; x <= last; x++) {
+            const outs: Side[] = [];
+            if (xs.has(x)) outs.push("down");
+            if (x < last) outs.push("right");
+            const b = belt(x, y, origin.z, [x === first ? "up" : "left"], outs, "in", input.itemName);
+            if (x === first) b.laneEnd = { kind: "in", items: [{ itemName: input.itemName, rate: segment.reduce((sum, e) => sum + e.rate, 0) }] };
+        }
+        segment = [];
+    };
+    for (const e of entries.sort((a, b) => a.x - b.x)) {
+        if (segment.reduce((sum, s) => sum + s.rate, 0) + e.rate > opts.beltSpeed + 1e-6) flush();
+        segment.push(e);
+    }
+    flush();
+    placements.push(...decks, ...belts);
+    // Beam ends rest on pillars (rows of them become side beams later, see finishSupports), raised belts too
+    const occupancy = buildOccupancy(placements);
+    const makeUid = () => nextUid("f");
+    for (const b of [...decks].sort((a, c) => a.z - c.z)) for (const endX of [b.x, b.x + w + 1]) placements.push(...supportColumn(occupancy, endX, b.y, b.z, 0, makeUid));
+    for (const b of belts.filter((s) => s.z > 0).sort((a, c) => a.z - c.z)) placements.push(...supportColumn(occupancy, b.x, b.y, b.z, 0, makeUid));
+
+    const width = columns * (w + 2);
+    return {
+        placements,
+        info: {
+            index,
+            nodeKey,
+            itemName: step.itemName,
+            deviceId: step.deviceId,
+            machines: count,
+            x: origin.x,
+            y: origin.y,
+            z: origin.z,
+            height: origin.z + (levels - 1) * pitch + fp.size.z,
+            width,
+            depth: d + 2,
+            turned: false,
+            columns,
+            rows: 1,
+            levels,
+            stacking: levels > 1 ? ("beam-deck" as const) : ("none" as const),
+            lanes: [laneInfo("in", 0, 0, origin.z, [input], count, opts.beltSpeed), laneInfo("out", width - 1, 0, origin.z, [output], levels, opts.beltSpeed)],
+            fluidInputs: step.fluidInputs,
+            offLanePorts: 0,
+        } satisfies TierInfo,
+    };
+}
 
 const ENHANCED_GRINDER = "enhanced-grinder";
 /** The enhanced grinder works twice as fast as a grinder */
@@ -1442,17 +1688,19 @@ export function generateModule(allSteps: ModuleStep[], given: ModuleOptions): Ge
     const single = !groups || groups.length === 1;
     const blocksOf = (opts: ModuleOptions) =>
         !groups ? generateBlocks(allSteps, opts, WORK_BUDGET, true) : generateBlocks(groups[0].steps, { ...opts, stackBlocks: groups[0].tower || opts.stackBlocks }, WORK_BUDGET, true);
-    let module = withWorkLimit(MAX_WORK, () => (single ? blocksOf(options) : generateGrouped(allSteps, groups!, options)));
+    let best = withWorkLimit(MAX_WORK, () => (single ? blocksOf(options) : generateGrouped(allSteps, groups!, options)));
     // Doesn't work within the size asked for: wider and deeper together, step by step, until it does
-    const better = (a: GeneratedModule, b: GeneratedModule) => brokenCount(a) - brokenCount(b) || a.size[0] * a.size[1] - b.size[0] * b.size[1];
     for (const factor of GROW_FACTORS) {
-        if (!single || brokenCount(module) === 0) break;
+        if (!single || brokenCount(best) === 0) break;
         const grown = { ...options, maxWidth: Math.round(given.maxWidth * factor), maxDepth: Math.round(given.maxDepth * factor) };
         options.onProgress?.(0, `Doesn't fit in ${given.maxWidth}×${given.maxDepth}: trying ${grown.maxWidth}×${grown.maxDepth}`);
+        // Every size gets its try, even after one that fixed nothing: a bigger one still may
+        // (stopping early cost the benchmark a working Emerald module)
         const next = withWorkLimit(GROW_WORK, () => blocksOf(grown));
-        if (better(next, module) < 0) module = { ...next, grownTo: [grown.maxWidth, grown.maxDepth] };
+        if (brokenCount(next) < brokenCount(best) || (brokenCount(next) === brokenCount(best) && next.size[0] * next.size[1] < best.size[0] * best.size[1]))
+            best = { ...next, grownTo: [grown.maxWidth, grown.maxDepth] };
     }
-    return { ...module, work: routingWork() - startWork };
+    return { ...best, work: routingWork() - startWork };
 }
 
 /**
@@ -1540,10 +1788,27 @@ function buildBlocks(allSteps: ModuleStep[], options: ModuleOptions) {
         if (!fp || count <= 0) continue;
         const rot = machineRotation(fp);
         if (STACKS_ON_ITSELF.has(step.deviceId) && step.heating) {
-            // Cauldrons: their own layout, as many per block as fit
-            const perBlock = Math.max(1, Math.floor((options.maxWidth - 1) / CAULDRON_PITCH)) * Math.max(1, options.maxStack);
+            // Cauldrons: their own layout, as many per block as fit, shared evenly between the
+            // blocks (a last block of one column would lose the shared lanes)
+            const perBlock = Math.max(1, Math.floor((options.maxWidth - 1) / cauldronPitch(fp, options.maxStack, 2))) * Math.max(1, options.maxStack);
+            const blockCount = Math.ceil(count / perBlock);
+            for (let t = 0; t < blockCount; t++) {
+                const n = Math.floor(count / blockCount) + (t < count % blockCount ? 1 : 0);
+                const block = buildCauldronTier(step, n, fp, { x: 0, y: 1, z: 0 }, blocks.length, options, can);
+                block.info.y = 0;
+                block.info.depth += 1;
+                block.placements = block.placements.map((p) => ({ ...p, block: blocks.length }));
+                blocks.push(block);
+            }
+            continue;
+        }
+        // One machine has nothing to stack on: it stays a plain block
+        const columnsPlan = count >= 2 ? deckColumnsFor(step, fp, options, can) : null;
+        if (columnsPlan) {
+            // Columns as wide as the width allows, each as high as the plan says
+            const perBlock = Math.max(1, Math.floor(options.maxWidth / (columnsPlan.w + 2))) * columnsPlan.levels;
             for (let left = count; left > 0; left -= perBlock) {
-                const block = buildCauldronTier(step, Math.min(left, perBlock), fp, { x: 0, y: 1, z: 0 }, blocks.length, options, can);
+                const block = buildDeckColumns(step, Math.min(left, perBlock), fp, columnsPlan, { x: 0, y: 1, z: 0 }, blocks.length, options);
                 block.info.y = 0;
                 block.info.depth += 1;
                 block.placements = block.placements.map((p) => ({ ...p, block: blocks.length }));

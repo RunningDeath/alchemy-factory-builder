@@ -87,7 +87,13 @@ targets, research, settings
      - Raised outputs get their own belt stub (PR #4); raised inputs do too when the machine has no input at lane level (Iron Smelter fix, `3dd4b60`).
      - Heaters go under heated machines (`heatingPlatform`, aligned to the machine columns).
      - Supports under raised parts.
-   - **`buildCauldronTier`:** cauldrons stacked up to the height, columns 7 apart, a stub per input port with ports taken from the footprint, steam pads or stoves below.
+   - **`buildCauldronTier`:** cauldrons stacked up to the height, steam pads or stoves below.
+     - Every port takes any of the cauldron's items **[Player]**, so the front and back ports of one level share a lane per item along the row (one item per belt, split at each cauldron, a new lane where one belt is full). The two biggest flows go there.
+     - The left ports and the outputs sit between the columns and keep a belt each. The lanes close that gap at every level, so it must hold 2 lifts per level: columns stand 7 apart, 8 with 4 levels (`cauldronPitch`).
+   - **`buildDeckColumns`:** machines with one input and one output that have no deck the usual way (a table saw is 4 long: no beam fits across it) stack the way the player builds them ("90 Bretter Modul"):
+     - Turned so items enter at the front and leave at the back, on a deck of beams across a column one cell wider on each side.
+     - Upper levels are fed by a lift in the front row and send their output down by a lift in the back row, merged with the bottom machine's output.
+     - As many levels as one output belt carries, at most 3; only for 2 or more machines.
    - **`chooseShape`:** picks the block shape, weighing floor against the lifts and raised belts that upper levels need. `LEVEL_LANE_FLOORS` gives two weightings; `generateBlocks` tries both when they lead to different shapes.
 
 ## 5. Towers: `buildTowers`
@@ -115,6 +121,7 @@ targets, research, settings
   - Counted in **router search steps**, not time (PR #4), so the same plan gives the same module on every machine.
   - `WORK_BUDGET` = 18 million steps: once a layout routes everything, no more layouts are tried past it.
   - `MAX_WORK` = 3 × budget: a hard cap per module.
+- **Growing:** when no layout routes everything within the width and depth asked for, both grow together (×1.25, ×1.5, ×2) until one works. Every size gets its try: stopping after a size that fixed nothing saved time but lost working modules (Emerald in the benchmark).
 - **Module groups** (`moduleGroupsOf`, `generateGrouped`): with "Build as modules", each group is laid out on its own and the modules are arranged side by side, front to back.
 
 ## 7. Routing: `routeModule` → `routeOnce`

@@ -88,6 +88,7 @@ The human-readable version with diagrams is `docs/game-rules.html`. Open questio
   - **Three different inputs:** with an item in two slots, the first slot fills completely before the second gets any, which delays the start. **[Player]**
   - **Prefer plant-based mixes:** they need only nurseries and grinders and save heating pads. Redcurrant + Sage + Sage Powder → Clay is the best Clay mix. **[Player]**
   - **Filters are set in the blueprint:** `CauldronFilterName`, an array of three item names. **[Blueprint]**
+  - **Every input port takes any of its items:** the same item needn't come in at the same side on every cauldron, so one belt per item can feed a row of cauldrons (split evenly between them, so they start together). Rather one item per belt; two only when they fit on one belt. **[Player]**
   - **Stacking:** cauldrons stack on each other and share the heat below. **[Player]** (Factory 4: Growth Potion)
   - **Spacing:** columns stand **7 cells apart**, so one cauldron's output doesn't run into its neighbour's input. A lift can't pass items across several stages. **[Player]**
 - **Advanced Cauldron** (two inputs, level 8):
@@ -154,8 +155,9 @@ The human-readable version with diagrams is `docs/game-rules.html`. Open questio
   - Machines rest on grinder-sized machines, lab stands, beams, wood blocks and stoves, never on other machines. Cauldrons are the exception and stack on cauldrons.
   - Pipes carry nothing.
   - **[Blueprint]**
+- **Table saws and stone crushers stack on beam decks:** the machine turned so items enter at the front and leave at the back (3 wide), a beam along each side at its top on wood-block pillars, beams across on those (beam5), the next machine on that deck. A lift up in the front row feeds the upper machine; a lift down in the back row brings its output to the floor. **[Blueprint]** (the player's "90 Bretter Modul", "90 Steine Modul")
 - **Raised belts** need supports down to the ground or a carrying cell: lab stands (a belt can share their cell) or wood blocks. **[Blueprint]**
-- **Heated blocks** keep their heater platform on the ground. **[Data]**/**[Assumed]**
+- **Heated blocks** can stand raised too: the heater platform needs supports below like any machine, and with steam the pipe has to reach its port from above (it is connected upwards). **[Player]** (earlier assumed: heaters stay on the ground)
 - **Module flow:** modules stand side by side; raw materials come in at the **front**, products leave at the **back**; leftovers for a sink may also leave at the sides.
 - **Unlocks:** buildings become available by level (research, workbench, quests; `data/building-unlocks.json`, levels 1–10). A plan whose byproducts share a belt is refused until Filter Splitters are unlocked. **[Data]**
 
