@@ -22,6 +22,9 @@ interface ExportBlueprintDialogProps {
 }
 
 const PREVIEW_SIZE = 512;
+/** A normal folder the game's blueprint folder is linked to: Chrome and Edge refuse anything under AppData */
+const LINKED_FOLDER = "C:\\AlchemyFactory\\Blueprints";
+const JUNCTION_COMMAND = `$src="$env:LOCALAPPDATA\\AlchemyFactory\\Saved\\Blueprints"; $dst="${LINKED_FOLDER}"; Copy-Item $src "$src-backup" -Recurse; New-Item -ItemType Directory -Force (Split-Path $dst) | Out-Null; Move-Item $src $dst; New-Item -ItemType Junction -Path $src -Target $dst`;
 const itemIdByName = new Map((itemsData as unknown as Item[]).map((i) => [i.name, i.id]));
 
 /** Top-down picture of the module: each cell shows its highest building, higher is brighter */
@@ -210,11 +213,23 @@ export function ExportBlueprintDialog({ placements, itemColors, defaultTitle, ma
 
                 <div className="text-[11px] text-[var(--text-muted)] flex flex-col gap-1 border-t border-[var(--border)] pt-2">
                     {direct ? (
-                        <p>
-                            <b>Save to game</b> asks once for the game&apos;s blueprint folder,{" "}
-                            <code className="text-[var(--text-secondary)]">{GAME_BLUEPRINT_FOLDER}</code> (paste that into the folder
-                            dialog&apos;s address bar), and saves there from then on. Restart the game; the blueprint then shows up in your list.
-                        </p>
+                        <>
+                            <p>
+                                <b>Save to game</b> asks once for a folder and saves there from then on. Restart the game; the blueprint then
+                                shows up in your list.
+                            </p>
+                            <p>
+                                The browser refuses the game&apos;s own folder (<code className="text-[var(--text-secondary)]">{GAME_BLUEPRINT_FOLDER}</code>,
+                                under AppData). Link it once to a normal folder: with the game closed, run in PowerShell
+                            </p>
+                            <code className="block whitespace-pre-wrap break-all rounded bg-[var(--background)] p-1.5 text-[var(--text-secondary)] select-all">
+                                {JUNCTION_COMMAND}
+                            </code>
+                            <p>
+                                (it keeps a backup copy next to it), then pick <code className="text-[var(--text-secondary)]">{LINKED_FOLDER}</code> here. The game
+                                reads its blueprints through the link as before.
+                            </p>
+                        </>
                     ) : (
                         <p>
                             Put the file into <code className="text-[var(--text-secondary)]">{GAME_BLUEPRINT_FOLDER}\</code> and restart the
