@@ -60,6 +60,8 @@ interface Case {
     /** Best fuel and fertilizer made at this level (item ids; "" for none), see suppliesAt */
     fuel: string;
     fertilizer: string;
+    /** Research levels besides none (analysis runs: what a case needs to build cleanly) */
+    research?: Partial<Pick<PlannerConfig, "logisticsEfficiency" | "factoryEfficiency">>;
 }
 
 const label = (c: Pick<Case, "item" | "rate" | "level" | "cauldron">) => `${c.item}@${c.rate} L${c.level}${c.cauldron ? " cauldron" : ""}`;
@@ -122,6 +124,7 @@ const config = (c: Case): PlannerConfig => ({
     fertilizerReserve: 0.25,
     planParallelLines: true,
     machineRounding: "up",
+    ...c.research,
 });
 
 function stepsFor(c: Case) {
